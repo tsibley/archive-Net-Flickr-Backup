@@ -1,0 +1,31 @@
+# $Id: Changes,v 1.7 2005/09/01 20:21:25 asc Exp $
+Changes for the Net::Flickr::Backup Perl library
+
+1.2	Thu Sep 01 2005
+
+	- Added throttling
+
+	- Added hooks to use Log::Dispatch
+
+	- Added fetch_* config options
+
+	- POD
+
+	- Require RDF::Simple 0.21
+
+	- Send UserAgent header
+
+	- Initial public release
+
+1.1	Wed Jun 22 2005
+
+	- Require Flickr::API 0.07; added support for the
+	  auth API
+
+	- Download 'square' and 'small' versions
+
+	- Updated RDF to use SKOS for tags descriptions
+
+1.0	Sun Feb	06 2005
+
+	- Initial release.

@@ -1,0 +1,376 @@
+NAME
+    Net::Flickr::Backup - OOP for backing up your Flickr photos locally
+
+SYNOPSIS
+        use Net::Flickr::Backup;
+        use Log::Dispatch::Screen;
+    
+        my $flickr = Net::Flickr::Backup->new("/path/to/backup.cfg");
+
+        my $feedback = Log::Dispatch::Screen->new('name'      => 'info',
+                                                  'min_level' => 'info');
+
+        $flickr->log()->add($feedback);
+        $flickr->backup(); 
+
+DESCRIPTION
+    OOP for backing up your Flickr photos locally.
+
+OPTIONS
+    Options are passed to Net::Flickr::Backup using a Config::Simple object
+    or a valid Config::Simple config file. Options are grouped by "block".
+
+  flick
+    * api_key
+        String. *required*
+
+        A valid Flickr API key.
+
+    * api_secret
+        String. *required*
+
+        A valid Flickr Auth API secret key.
+
+    * auth_token
+        String. *required*
+
+        A valid Flickr Auth API token.
+
+  backup
+    * photos_root
+        String. *required*
+
+        The root folder where you want photographs to be stored. Individual
+        files are named using the following pattern :
+
+          B<photos_root>/B<YYYY>/B<MM>/B<DD>/B<YYYYMMDD>-B<photo_id>-B<clean_title>_B<size>.jpg
+
+        Where the various components are :
+
+        * YYYYMMDD
+             photo[@id=123]/dates/@taken
+
+        * photo_id
+            photo/@id
+
+        * clean_title
+             photo[@id=123]/title
+
+            Unicode characters translated in to ASCII (using
+            Text::Unidecode) and the entire string is stripped anything that
+            is not an alphanumeric, underbar, dash or a square bracket.
+
+        * size
+            Net::Flickr::Backup will attempt to fetch not only the original
+            file uploaded to Flickr but also, depending on your config
+            options, the medium and square versions. Filenames will be
+            modified as follows :
+
+            * original
+                The original photo you uploaded to the Flickr servers. No
+                extension is added.
+
+            * medium
+                These photos are scaled to 500 pixels at the longest
+                dimension. A _m extension is added.
+
+            * square
+                These photos are to cropped to 75 x 75 pixels at the center.
+                A _s extension is added.
+
+    * fetch_medium
+        Boolean.
+
+        Retrieve the "medium" version of a photo from the Flickr servers;
+        these photos have been scaled to 500 pixels at the longest
+        dimension.
+
+        Default is false.
+
+    * fetch_square
+        Boolean.
+
+        Retrieve the "square" version of a photo from the Flickr servers;
+        these photos have been cropped to 75 x 75 pixels at the center.
+
+        Default is false.
+
+    * scrub_backups
+        Boolean.
+
+        If true then, for each Flickr photo ID backed up, the library will
+        check backup.photos_root for images (and metadata files) with a
+        matching ID but a different name. Matches will be deleted.
+
+    * force
+        Boolean.
+
+        Force a photograph to be backed up even if it has not changed.
+
+        Default is false.
+
+  rdf
+    * do_dump
+        Boolean.
+
+        Generate an RDF description for each photograph. Descriptions are
+        written to disk in separate files.
+
+        Default is false.
+
+    * rdfdump_root
+        String.
+
+        The path where RDF data dumps for a photo should be written. The
+        default is the same path as backup.photos_root.
+
+        File names are generated with the same pattern used to name
+        photographs.
+
+    * photos_alias
+        String.
+
+        If defined this string is applied as regular expression substitution
+        to backup.photos_root.
+
+        Default is to append the file:/ URI protocol to a path.
+
+  search
+    Any valid parameter that can be passed to the *flickr.photos.search*
+    method except 'user_id' which is pre-filled with the user_id that
+    corresponds to the flickr.auth_token token.
+
+PACKAGE METHODS
+  __PACKAGE__->new($cfg)
+    Returns a *Net::Flickr::Backup* object.
+
+  $obj->log()
+    Returns a *Log::Dispatch* object.
+
+  $obj->backup()
+    Returns true or false.
+
+RDF
+    This is an example of an RDF dump for a photograph backed up from Flickr
+    :
+
+     <?xml version = "1.0" encoding = "UTF-8" ?>
+      <rdf:RDF
+       xmlns:dc="http://purl.org/dc/elements/1.1/"
+       xmlns:a="http://www.w3.org/2000/10/annotation-ns"
+       xmlns:acl="http://www.w3.org/2001/02/acls#"
+       xmlns:exif="http://nwalsh.com/rdf/exif#"
+       xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+       xmlns:exifi="http://nwalsh.com/rdf/exif-intrinsic#"
+       xmlns:foaf="http://xmlns.com/foaf/0.1/#"
+       xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+       xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+       xmlns:i="http://www.w3.org/2004/02/image-regions#"
+      >
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528">
+        <exif:isoSpeedRatings>1250</exif:isoSpeedRatings>
+        <exif:apertureValue>336/100</exif:apertureValue>
+        <exif:pixelYDimension>960</exif:pixelYDimension>
+        <exif:focalLength>4.5 mm</exif:focalLength>
+        <acl:access>visbility</acl:access>
+        <exif:colorSpace>sRGB</exif:colorSpace>
+        <exif:dateTimeOriginal>2005:08:02 18:12:19</exif:dateTimeOriginal>
+        <dc:rights>All rights reserved.</dc:rights>
+        <exif:shutterSpeedValue>4321/1000</exif:shutterSpeedValue>
+        <dc:description></dc:description>
+        <exif:exposureTime>0.05 sec (263/5260)</exif:exposureTime>
+        <dc:created>2005-08-02T18:12:19-0700</dc:created>
+        <dc:dateSubmitted>2005-08-02T18:16:20-0700</dc:dateSubmitted>
+        <exif:gainControl>High gain up</exif:gainControl>
+        <exif:flash>32</exif:flash>
+        <exif:digitalZoomRatio>100/100</exif:digitalZoomRatio>
+        <exif:pixelXDimension>1280</exif:pixelXDimension>
+        <exif:dateTimeDigitized>2005:08:02 18:12:19</exif:dateTimeDigitized>
+        <dc:title>20050802(007).jpg</dc:title>
+        <exif:fNumber>f/3.2</exif:fNumber>
+        <acl:accessor>public</acl:accessor>
+        <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+        <dc:subject rdf:resource="http://flickr.com/photos/tags/sanfrancisco#102449778"/>
+        <dc:subject rdf:resource="http://flickr.com/photos/tags/cameraphone#102449777"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140939"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140945"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140946"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140952"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142648"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1143239"/>
+        <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1148950"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/StillImage"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942">
+        <i:boundingBox>468 141 22 26</i:boundingBox>
+        <a:body>*sigh*</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656">
+        <i:boundingBox>357 193 81 28</i:boundingBox>
+        <a:body>eww!</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/people/44124415257@N01">
+        <foaf:mbox_sha1sum>4f6f211958d5217ef0d10f7f5cd9a69cd66f217e</foaf:mbox_sha1sum>
+        <foaf:name>Karl Dubost</foaf:name>
+        <foaf:nick>karlcow</foaf:nick>
+        <rdfs:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140939">
+        <i:boundingBox>326 181 97 25</i:boundingBox>
+        <a:body>Did you see that this shirt makes me a beautiful breast?</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140952">
+        <i:boundingBox>9 205 145 55</i:boundingBox>
+        <a:body>Do you want my opinion? There's a love affair going on here… Anyway. Talking non sense. We all know Heather is committed to Flickr. She even only dresses at FlickrApparel. Did they say &amp;quot;No Logo&amp;quot;. Doh Dude.</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/people/34427469121@N01">
+        <foaf:mbox_sha1sum>216d56f03517c68e527c5b970552a181980c4389</foaf:mbox_sha1sum>
+        <foaf:name>George Oates</foaf:name>
+        <foaf:nick>George</foaf:nick>
+        <rdfs:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140946">
+        <i:boundingBox>355 31 103 95</i:boundingBox>
+        <a:body>(Yes… I love you heather, you are my dream star)</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1143239">
+        <i:boundingBox>184 164 50 50</i:boundingBox>
+        <a:body>Baaaaarp!</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/34427469121@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140945">
+        <i:boundingBox>433 103 50 50</i:boundingBox>
+        <a:body>(fuck… fuck…)</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://example.com/2005/08/02/20050802-30763528-20050802_007.jpg">
+        <dc:creator>asc</dc:creator>
+        <exifi:height>960</exifi:height>
+        <exifi:width>1280</exifi:width>
+        <dc:created>2005-08-03T20:47:50-0700</dc:created>
+        <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/people/32373682187@N01">
+        <foaf:mbox_sha1sum>62bf10c8d5b56623226689b7be924c64dee5e94a</foaf:mbox_sha1sum>
+        <foaf:name>heather powazek champ</foaf:name>
+        <foaf:nick>heather</foaf:nick>
+        <rdfs:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://flickr.com/photos/tags/sanfrancisco#102449778">
+        <skos:prefLabel>san francisco</skos:prefLabel>
+        <skos:altLabel>sanfrancisco</skos:altLabel>
+        <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+        <rdfs:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142648">
+        <i:boundingBox>202 224 50 50</i:boundingBox>
+        <a:body>dude! who did this?</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://flickr.com/photos/tags/cameraphone#102449777">
+        <skos:prefLabel>cameraphone</skos:prefLabel>
+        <skos:altLabel>cameraphone</skos:altLabel>
+        <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+        <rdfs:type rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://example.com/2005/08/02/20050802-30763528-20050802_007_m.jpg">
+        <dc:creator>asc</dc:creator>
+        <exifi:height>375</exifi:height>
+        <exifi:width>500</exifi:width>
+        <dc:created>2005-08-03T20:47:47-0700</dc:created>
+        <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://example.com/2005/08/02/20050802-30763528-20050802_007_t.jpg">
+        <dc:creator>asc</dc:creator>
+        <exifi:height>75</exifi:height>
+        <exifi:width>100</exifi:width>
+        <dc:created>2005-08-03T20:47:47-0700</dc:created>
+        <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1148950">
+        <i:boundingBox>342 197 28 33</i:boundingBox>
+        <a:body>Is that just one big boob, or...?</a:body>
+        <a:author rdf:resource="http://www.flickr.com/people/34427469121@N01"/>
+        <rdfs:type rdf:resource="http://purl.org/dc/dcmitype/Text"/>
+        <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+      </rdf:Description>
+
+      <rdf:Description rdf:about="http://www.flickr.com/people/35034348999@N01">
+        <foaf:mbox_sha1sum>a4d1b5e38db5e2ed4f847f9f09fd51cf59bc0d3f</foaf:mbox_sha1sum>
+        <foaf:name>Aaron</foaf:name>
+        <foaf:nick>straup</foaf:nick>
+        <rdfs:type rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+      </rdf:Description>
+
+     </rdf:RDF>
+
+VERSION
+    1.2
+
+DATE
+    $Date: 2005/09/01 22:41:33 $
+
+AUTHOR
+    Aaron Straup Cope <ascope@cpan.org>
+
+TO DO
+    Support for the Flickr API photos.getAllContexts method to record the
+    groups, sets, etc. to which a photo belongs.
+
+SEE ALSO
+    Flickr::API
+
+    Config::Simple
+
+    http://www.flickr.com/services/api/misc.userauth.html
+
+BUGS
+    Please report all bugs via http://rt.cpan.org
+
+LICENSE
+    Copyright (c) 2005 Aaron Straup Cope. All Rights Reserved.
+
+    This is free software. You may redistribute it and/or modify it under
+    the same terms as Perl itself.
+
