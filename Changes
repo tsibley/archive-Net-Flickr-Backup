@@ -1,5 +1,42 @@
-# $Id: Changes,v 1.7 2005/09/01 20:21:25 asc Exp $
+# $Id: Changes,v 1.11 2005/09/25 22:45:31 asc Exp $
+
 Changes for the Net::Flickr::Backup Perl library
+
+2.0	Sun Sep 25 2005
+
+	- UPDATED to sub-class Net::Flickr::RDF 1.0
+
+	- ADDED 'backup_photo' method
+
+	- ADDED option to toggle whether or not originals are
+          downloaded
+
+1.3	Wed Sep 14 2005
+
+	- The 'Embarassing Bugs' bug-fix (never-released) release :
+
+	- FIXED RT bug #14429 to check for required Config::Simple blocks
+
+	- FIXED a bug where already decoded UTF-8 was being decoded
+          again
+
+	- FIXED to use rdf, not rdfs, for 'type'
+
+	- UPDATED to include groups and photosets in RDF dump
+
+	- UPDATED basically the entire RDF schema to use a Flickr
+          specific namespace for photos, notes, tags, groups, users
+          and photosets
+
+	- UPDATED RDF schema for dc:creator for actual downloads
+
+	- UPDATED to require RDF::Simple ...
+
+	- ADDED Memoize to list of requirements
+
+	- ADDED Sys::Hostname::FQDN to list of requirements
+
+	- ADDED example config file to POD
 
 1.2	Thu Sep 01 2005
 
