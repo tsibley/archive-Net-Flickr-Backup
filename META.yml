@@ -1,6 +1,6 @@
 ---
 name: Net-Flickr-Backup
-version: 2.0
+version: 2.1
 author:
   - Aaron Straup Cope E<lt>ascope@cpan.orgE<gt>
 abstract: OOP for backing up your Flickr photos locally
@@ -13,7 +13,7 @@ requires:
   IO::AtomicFile: >= 2.101
   LWP::Simple: >= 1.38
   Memoize: 0
-  Net::Flickr::RDF: >= 1.0
+  Net::Flickr::RDF: >= 1.1
   Sys::Hostname::FQDN: 0
   perl: >= 5.8.0
 build_requires:
@@ -21,5 +21,5 @@ build_requires:
 provides:
   Net::Flickr::Backup:
     file: lib/Net/Flickr/Backup.pm
-    version: 2.0
+    version: 2.1
 generated_by: Module::Build version 0.2611

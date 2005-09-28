@@ -1,6 +1,12 @@
-# $Id: Changes,v 1.11 2005/09/25 22:45:31 asc Exp $
+# $Id: Changes,v 1.12 2005/09/28 15:50:45 asc Exp $
 
 Changes for the Net::Flickr::Backup Perl library
+
+2.1	Wed Sep 28 2005
+
+	- UPDATED to require Net::Flickr::RDF 1.1
+
+	- UPDATED POD
 
 2.0	Sun Sep 25 2005
 

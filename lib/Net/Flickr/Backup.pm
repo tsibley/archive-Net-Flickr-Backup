@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.63 2005/09/25 22:48:16 asc Exp $
+# $Id: Backup.pm,v 1.64 2005/09/28 15:50:45 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.0';
+$Net::Flickr::Backup::VERSION = '2.1';
 
 =head1 NAME
 
@@ -975,6 +975,7 @@ with 'cameraphone' from Flickr
 
 This is an example of an RDF dump for a photograph backed up from Flickr :
 
+
  <?xml version='1.0'?>    
  <rdf:RDF
   xmlns:dc="http://purl.org/dc/elements/1.1/"
@@ -1067,7 +1068,7 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </flickr:note>
 
-  <flickr:tag rdf:about="http://www.flickr.com/people/tags/usa">
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/usa">
     <skos:prefLabel>usa</skos:prefLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
     <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/usa"/>
@@ -1089,7 +1090,7 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </dcterms:StillImage>
 
-  <flickr:tag rdf:about="http://www.flickr.com/people/tags/cameraphone">
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone">
     <skos:prefLabel>cameraphone</skos:prefLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
     <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/cameraphone"/>
@@ -1174,7 +1175,7 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <rdfs:subClassOf rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
   </rdf:Description>
 
-  <flickr:tag rdf:about="http://www.flickr.com/people/tags/california">
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/california">
     <skos:prefLabel>california</skos:prefLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
     <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/california"/>
@@ -1221,7 +1222,7 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
   </rdf:Description>
 
-  <flickr:tag rdf:about="http://www.flickr.com/people/tags/sanfrancisco">
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco">
     <skos:prefLabel>san francisco</skos:prefLabel>
     <skos:altLabel>sanfrancisco</skos:altLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
@@ -1232,11 +1233,11 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
 =head1 VERSION
 
-2.0
+2.1
 
 =head1 DATE
 
-$Date: 2005/09/25 22:48:16 $
+$Date: 2005/09/28 15:50:45 $
 
 =head1 AUTHOR
 

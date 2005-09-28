@@ -1,4 +1,4 @@
-# $Id: Build.PL,v 1.10 2005/09/25 22:45:31 asc Exp $
+# $Id: Build.PL,v 1.11 2005/09/28 15:50:45 asc Exp $
 
 use strict;
 use Module::Build;
@@ -10,7 +10,7 @@ my $build = Module::Build->new(module_name => 'Net::Flickr::Backup',
 			       license           => 'perl',
 			       requires => {
 				   'perl'            => '>= 5.8.0',
-				   'Net::Flickr::RDF' => '>= 1.0',
+				   'Net::Flickr::RDF' => '>= 1.1',
 				   'Encode'          => '>= 2.09',
 				   'File::Find::Rule' => '0',
 				   'Date::Parse'     => '>= 2.27',
