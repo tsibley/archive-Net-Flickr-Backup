@@ -1,6 +1,13 @@
-# $Id: Changes,v 1.15 2005/12/17 17:59:23 asc Exp $
+# $Id: Changes,v 1.17 2005/12/18 04:35:08 asc Exp $
 
 Changes for the Net::Flickr::Backup Perl library
+
+2.4     Sat Dec 17 2005
+
+        - Fixed a bug where root directories for RDF files were not
+          being created properly (like, at all)
+
+        - Require Net::Flickr::RDF 1.5
 
 2.3     Sat Dec 17 2005
 

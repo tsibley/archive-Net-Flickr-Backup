@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.66 2005/12/17 17:59:23 asc Exp $
+# $Id: Backup.pm,v 1.67 2005/12/18 04:18:35 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.3';
+$Net::Flickr::Backup::VERSION = '2.4';
 
 =head1 NAME
 
@@ -244,28 +244,28 @@ Returns a I<Net::Flickr::Backup> object.
 # Defined in Net::Flickr::API
 
 sub init {
-    my $self = shift;
-    my $cfg  = shift;
-
-    if (! $self->SUPER::init($cfg)) {
-	return 0;
-    }
-
-    # Ensure that we have 'flickr' and 'backup'
-    # config blocks
-
-    foreach my $block ('flickr','backup') {
-
-	my $test = $self->{cfg}->param(-block=>$block);
-
-	if (! keys %$test) {
-	    $self->log()->error("unable to find any properties for $block block in config file");
-	    return 0;
-	}
-    }
-
-    memoize("_clean");
-    return 1;
+        my $self = shift;
+        my $cfg  = shift;
+        
+        if (! $self->SUPER::init($cfg)) {
+                return 0;
+        }
+        
+        # Ensure that we have 'flickr' and 'backup'
+        # config blocks
+        
+        foreach my $block ('flickr','backup') {
+                
+                my $test = $self->{cfg}->param(-block=>$block);
+                
+                if (! keys %$test) {
+                        $self->log()->error("unable to find any properties for $block block in config file");
+                        return 0;
+                }
+        }
+        
+        memoize("_clean");
+        return 1;
 }
 
 =head1 PACKAGE METHODS YOU SHOULD CARE ABOUT
@@ -279,81 +279,81 @@ Returns true or false.
 =cut
 
 sub backup {
-    my $self = shift;
-    my $args = shift;
-
-    my $auth = $self->_auth();
-
-    if (! $auth) {
-	return 0;
-    }
-
-    #
-
-    my $photos_root = $self->{cfg}->param("backup.photos_root");
-    
-    if (! $photos_root) {
-	$self->log()->error("no photo root defined, exiting");
-	return 0;
-    }
-
-    #
-
-    my $search = $self->{cfg}->param(-block=>"search");
-    $search->{user_id} = $auth->findvalue("/rsp/auth/user/\@nsid");
-
-    my $num_pages    = 0;
-    my $current_page = 1;
-
-    my $poll = 1;
-
-    while ($poll) {
-
-	$search->{page} = $current_page;
-
-	#
-
-	my $photos = $self->api_call({"method" => "flickr.photos.search",
-				      args     => $search});
-
-	if (! $photos) {
-	    return 0;
-	}
-
-	$num_pages = $photos->findvalue("/rsp/photos/\@pages");
-
-	#
-
-	foreach my $node ($photos->findnodes("/rsp/photos/photo")) {
-
-	    $self->{'__files'} = {};
-
-	    my $id      = $node->getAttribute("id");
-	    my $secret  = $node->getAttribute("secret");
-
-	    $self->log()->info(sprintf("process image %d (%s)",
-				       $id,&_clean($node->getAttribute("title"))));
-
-	    #
-
-	    $self->backup_photo($id,$secret);
-	}
-
-	if ($current_page == $num_pages) {
-	    $poll = 0;
-	}
-
-	$current_page ++;
-    }
-
-    #
-
-    if ($self->{cfg}->param("backup.scrub_backups")) {
-	$self->log()->info("scrubbing backups");
-	$self->scrub();
-    }
-
-    return 1;
+        my $self = shift;
+        my $args = shift;
+        
+        my $auth = $self->_auth();
+        
+        if (! $auth) {
+                return 0;
+        }
+        
+        #
+        
+        my $photos_root = $self->{cfg}->param("backup.photos_root");
+        
+        if (! $photos_root) {
+                $self->log()->error("no photo root defined, exiting");
+                return 0;
+        }
+        
+        #
+        
+        my $search = $self->{cfg}->param(-block=>"search");
+        $search->{user_id} = $auth->findvalue("/rsp/auth/user/\@nsid");
+        
+        my $num_pages    = 0;
+        my $current_page = 1;
+        
+        my $poll = 1;
+        
+        while ($poll) {
+                
+                $search->{page} = $current_page;
+                
+                #
+                
+                my $photos = $self->api_call({"method" => "flickr.photos.search",
+                                              args     => $search});
+                
+                if (! $photos) {
+                        return 0;
+                }
+                
+                $num_pages = $photos->findvalue("/rsp/photos/\@pages");
+                
+                #
+                
+                foreach my $node ($photos->findnodes("/rsp/photos/photo")) {
+                        
+                        $self->{'__files'} = {};
+                        
+                        my $id      = $node->getAttribute("id");
+                        my $secret  = $node->getAttribute("secret");
+                        
+                        $self->log()->info(sprintf("process image %d (%s)",
+                                                   $id,&_clean($node->getAttribute("title"))));
+                        
+                        #
+                        
+                        $self->backup_photo($id,$secret);
+                }
+                
+                if ($current_page == $num_pages) {
+                        $poll = 0;
+                }
+                
+                $current_page ++;
+        }
+        
+        #
+        
+        if ($self->{cfg}->param("backup.scrub_backups")) {
+                $self->log()->info("scrubbing backups");
+                $self->scrub();
+        }
+        
+        return 1;
 }
 
 =head1 PACKAGE METHODS YOU MAY CARE ABOUT
@@ -368,203 +368,214 @@ I<backup>.
 =cut
 
 sub backup_photo {
-    my $self   = shift;
-    my $id     = shift;
-    my $secret = shift;
+        my $self   = shift;
+        my $id     = shift;
+        my $secret = shift;
+        
+        if (! $self->_auth()) {
+                return 0;
+        }
+        
+        #
+        
+        my $force       = $self->{cfg}->param("backup.force");
+        my $photos_root = $self->{cfg}->param("backup.photos_root");
+        
+        if (! $photos_root) {
+                $self->log()->error("no photo root defined, exiting");
+                return 0;
+        }
+        
+        # RDF
+        
+        my $do_rdf   = $self->{cfg}->param("rdf.do_dump");
+        my $rdf_root = $self->{cfg}->param("rdf.rdfdump_root");
 
-    if (! $self->_auth()) {
-	return 0;
-    }
-
-    #
-
-    my $force       = $self->{cfg}->param("backup.force");
-
-    my $photos_root = $self->{cfg}->param("backup.photos_root");
-    
-    if (! $photos_root) {
-	$self->log()->error("no photo root defined, exiting");
-	return 0;
-    }
-
-    # RDF
-
-    my $do_rdf   = $self->{cfg}->param("rdf.do_dump");
-    my $rdf_root = $self->{cfg}->param("rdf.rdfdump_root");
-
-    if (($do_rdf) && (! $rdf_root)) {
-	$rdf_root = $photos_root;
-    }
-
-    #
-
-    my $info = $self->api_call({method=>"flickr.photos.getInfo",
-				args=>{photo_id => $id,
-				       secret   => $secret}});
-    
-    if (! $info) {
-	return 0;
-    }
-
-    $self->{'_scrub'}->{$id} = [];
-
-    my $img = ($info->findnodes("/rsp/photo"))[0];
-
-    if (! $img) {
-	return 0;
-    }
-
-    my $dates = ($img->findnodes("dates"))[0];
-    
-    my $last_update = $dates->getAttribute("lastupdate");
-    my $has_changed = 1;
-    
-    #
-    
-    my %data = (photo_id => $id,
-		user_id  => $img->findvalue("owner/\@nsid"),
-		title    => $img->find("title")->string_value(),
-		taken    => $dates->getAttribute("taken"),
-		posted   => $dates->getAttribute("posted"),
-		lastmod  => $last_update);
-    
-    #
-    
-    my $title = &_clean($data{title}) || "untitled";
-    my $dt    = $data{taken};
-    
-    $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
-    my ($yyyy,$mm,$dd) = ($1,$2,$3);	  	    
-    
-    #
-    
-    my $sizes = $self->api_call({method => "flickr.photos.getSizes",
-				 args   => {photo_id => $id}});
-    
-    if (! $sizes) {
-	return 0;
-    }
-    
-    #
-    
-    my $fetch_cfg = $self->{cfg}->param(-block=>"backup");
-
-    foreach my $label (keys %FETCH_SIZES) {
-	
-	my $fetch_param = "fetch_".lc($label);
-	my $do_fetch    = 1;
-	
-	if (($label ne "Original") || (exists($fetch_cfg->{$fetch_param}))) {
-	    $do_fetch = $fetch_cfg->{$fetch_param};
+        if (($do_rdf) && (! $rdf_root)) {
+                $rdf_root = $photos_root;
+        }
+        
+        #
+        
+        my $info = $self->api_call({method=>"flickr.photos.getInfo",
+                                    args=>{photo_id => $id,
+                                           secret   => $secret}});
+        
+        if (! $info) {
+                return 0;
+        }
+        
+        $self->{'_scrub'}->{$id} = [];
+        
+        my $img = ($info->findnodes("/rsp/photo"))[0];
+        
+        if (! $img) {
+                return 0;
+        }
+        
+        my $dates = ($img->findnodes("dates"))[0];
+        
+        my $last_update = $dates->getAttribute("lastupdate");
+        my $has_changed = 1;
+        
+        #
+        
+        my %data = (photo_id => $id,
+                    user_id  => $img->findvalue("owner/\@nsid"),
+                    title    => $img->find("title")->string_value(),
+                    taken    => $dates->getAttribute("taken"),
+                    posted   => $dates->getAttribute("posted"),
+                    lastmod  => $last_update);
+        
+        #
+        
+        my $title = &_clean($data{title}) || "untitled";
+        my $dt    = $data{taken};
+        
+        $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        my ($yyyy,$mm,$dd) = ($1,$2,$3);	  	    
+        
+        #
+        
+        my $sizes = $self->api_call({method => "flickr.photos.getSizes",
+                                     args   => {photo_id => $id}});
+        
+        if (! $sizes) {
+                return 0;
+        }
+        
+        #
+        
+        my $fetch_cfg = $self->{cfg}->param(-block=>"backup");
+        
+        foreach my $label (keys %FETCH_SIZES) {
+                
+                my $fetch_param = "fetch_".lc($label);
+                my $do_fetch    = 1;
+                
+                if (($label ne "Original") || (exists($fetch_cfg->{$fetch_param}))) {
+                        $do_fetch = $fetch_cfg->{$fetch_param};
+                }
+                
+                if (! $do_fetch) {
+                        $self->log()->debug("$fetch_param option is false, skipping");
+                        next;
+                }
+                
+                #
+                
+                my $sz = ($sizes->findnodes("/rsp/sizes/size[\@label='$label']"))[0];
+                
+                if (! $sz) {
+                        $self->log()->warning("Unable to locate size info for key $label\n");
+                        next;
+                }
+                
+                my $source  = $sz->getAttribute("source");
+                
+                my $img_root  = File::Spec->catdir($photos_root,$yyyy,$mm,$dd);
+                my $img_fname = sprintf("%04d%02d%02d-%d-%s%s.jpg",$yyyy,$mm,$dd,$id,$title,$FETCH_SIZES{$label});
+                
+                push @{$self->{'_scrub'}->{$id}}, $img_fname;
+                
+                my $img_bak = File::Spec->catfile($img_root,$img_fname);
+                
+                #
+                
+                if (! $force) {
+                        if (! $has_changed) {
+                                $self->log()->info("$img_bak has not changed, skipping\n");
+                                next;
+                        }
+                        
+                        my $mtime = (stat($img_bak))[9];
+                        
+                        if ((-f $img_bak) && ($last_update) && ($mtime >= $last_update)) {
+                                $self->log()->info("$img_bak has not changed ($mtime/$last_update), skipping\n");
+                                $has_changed = 0;
+                                next;
+                        }
+                }
+                
+                #
+                
+                if (! -d $img_root) {
+                        
+                        $self->log()->info("create $img_root");
+                        
+                        if (! mkpath([$img_root],0,0755)) {
+                                $self->log()->error("failed to create $img_root, $!");
+                                next;
+                        }
+                }
+                
+                if (! getstore($source,$img_bak)) {
+                        $self->log()->error("failed to store '$source' as '$img_bak', $!\n");
+                        next;
+                }
+                
+                $self->log()->info("stored $img_bak");
+                
+                #
+                
+                $self->{'__files'}->{$label} = $img_bak;
+        }
+        
+        #
+        
+        if (! $do_rdf) {
+                return 1;
+        }
+        
+        my $meta_root  = File::Spec->catdir($rdf_root,$yyyy,$mm,$dd);
+        my $meta_fname = sprintf("%04d%02d%02d-%d-%s.xml",$yyyy,$mm,$dd,$id,$title);	
+        my $meta_bak   = File::Spec->catfile($meta_root,$meta_fname);
+        
+        if ((! $force) && (! $has_changed) && (-f $meta_bak)) {
+                return 1;
+        }
+        
+        push @{$self->{'_scrub'}->{$id}}, $meta_bak;
+        
+        #
+        
+        if (! -d $meta_root) {
+                
+                $self->log()->info("create $meta_root");
+                
+                if (! mkpath([$meta_root],0,0755)) {
+                        $self->log()->error("failed to create $meta_root, $!");
+                        next;
+                }
 	}
-	
-	if (! $do_fetch) {
-	    $self->log()->debug("$fetch_param option is false, skipping");
-	    next;
-	}
-	
-	#
-	
-	my $sz = ($sizes->findnodes("/rsp/sizes/size[\@label='$label']"))[0];
-	
-	if (! $sz) {
-	    $self->log()->warning("Unable to locate size info for key $label\n");
-	    next;
-	}
-	
-	my $source  = $sz->getAttribute("source");
-	
-	my $img_root  = File::Spec->catdir($photos_root,$yyyy,$mm,$dd);
-	my $img_fname = sprintf("%04d%02d%02d-%d-%s%s.jpg",$yyyy,$mm,$dd,$id,$title,$FETCH_SIZES{$label});
-	
-	push @{$self->{'_scrub'}->{$id}}, $img_fname;
-	
-	my $img_bak = File::Spec->catfile($img_root,$img_fname);
-	
-	#
-	
-	if (! $force) {
-	    if (! $has_changed) {
-		$self->log()->info("$img_bak has not changed, skipping\n");
-		next;
-	    }
-	    
-	    my $mtime = (stat($img_bak))[9];
-	    
-	    if ((-f $img_bak) && ($last_update) && ($mtime >= $last_update)) {
-		$self->log()->info("$img_bak has not changed ($mtime/$last_update), skipping\n");
-		$has_changed = 0;
-		next;
-	    }
-	}
-	
-	#
-	
-	if (! -d $img_root) {
-	    
-	    $self->log()->info("create $img_root");
-	    
-	    if (! mkpath([$img_root],0,0755)) {
-		$self->log()->error("failed to create $img_root, $!");
-		next;
-	    }
-	}
-	
-	if (! getstore($source,$img_bak)) {
-	    $self->log()->error("failed to store '$source' as '$img_bak', $!\n");
-	    next;
-	}
-	
-	$self->log()->info("stored $img_bak");
-	
-	#
-	
-	$self->{'__files'}->{$label} = $img_bak;
-    }
-    
-    #
-    
-    if (! $do_rdf) {
-	return 1;
-    }
-
-    my $meta_root  = File::Spec->catdir($rdf_root,$yyyy,$mm,$dd);
-    my $meta_fname = sprintf("%04d%02d%02d-%d-%s.xml",$yyyy,$mm,$dd,$id,$title);	
-    my $meta_bak   = File::Spec->catfile($meta_root,$meta_fname);
-    
-    if ((! $force) && (! $has_changed) && (-f $meta_bak)) {
-	return 1;
-    }
-	    
-    push @{$self->{'_scrub'}->{$id}}, $meta_bak;
-
-    #
-
-    $self->log()->info("fetching RDF data for photo");
-    
-    my $fh = IO::AtomicFile->open($meta_bak,"w");
-    
-    if (! $fh) {
-	$self->log()->error("failed to open '$meta_bak', $!");
-	return 0;
-    }
-
-    my $desc_ok = $self->describe_photo({photo_id => $id,
-					 secret   => $secret,
-					 fh       => \*$fh});
-    
-    if (! $desc_ok) {
-	$self->log()->error("failed to describe photo $id:$secret\n");
-	$fh->delete();
-	return 0;
-    }
-    
-    if (! $fh->close()) {
-	$self->log()->error("failed to write '$meta_bak', $!");
-	return 0;
-    }
-
-    return 1;
+        
+        #
+        
+        $self->log()->info("fetching RDF data for photo");
+        
+        my $fh = IO::AtomicFile->open($meta_bak,"w");
+        
+        if (! $fh) {
+                $self->log()->error("failed to open '$meta_bak', $!");
+                return 0;
+        }
+        
+        my $desc_ok = $self->describe_photo({photo_id => $id,
+                                             secret   => $secret,
+                                             fh       => \*$fh});
+        
+        if (! $desc_ok) {
+                $self->log()->error("failed to describe photo $id:$secret\n");
+                $fh->delete();
+                return 0;
+        }
+        
+        if (! $fh->close()) {
+                $self->log()->error("failed to write '$meta_bak', $!");
+                return 0;
+        }
+        
+        return 1;
 }
 
 =head2 $obj->scrub()
@@ -574,69 +585,69 @@ Returns true or false.
 =cut
 
 sub scrub {
-    my $self = shift;
-
-    if (! keys %{$self->{'_scrub'}}) {
-	return 1;
-    }
-
-    #
-
-    my $rule = File::Find::Rule->new();
-    $rule->file();
-    
-    $rule->exec(sub {
-	my ($shortname, $path, $fullname) = @_;
-
-	# print "test $shortname\n";
-
-	$shortname =~ /^\d{8}-(\d+)-/;
-	my $id = $1;
-
-	if (! exists($self->{'_scrub'}->{$id})) {
-	    return 0;
-	}
-	
-	if (grep/$shortname/,@{$self->{'_scrub'}->{$id}}) {
-	    return 0;
-	}
-	
-	return 1;
-    });
-
-    #
-
-    foreach my $root ($rule->in($self->{'cfg'}->param("backup.photos_root"))) {
-
-	if (! unlink($root)) {
-	    $self->log()->error("failed to unlink $root, $!");
-	    next;
-	}
-
-	# next unlink empty parent directories
-
-	my $dd_dir   = dirname($root);
-	my $mm_dir   = dirname($dd_dir);
-	my $yyyy_dir = dirname($mm_dir);
-
-	foreach my $path ($dd_dir,$mm_dir,$yyyy_dir) {
-	    if (&_has_children($path)) {
-		last;
-	    }
-
-	    else {
-		if (! rmtree([$path],0,1)) {
-		    $self->log()->error("failed to unlink, $path");
-		    last;
-		}
-	    }
-	}	
-    }
-
-    #
-
-    $self->{'_scrub'} = {};
-    return 1;
+        my $self = shift;
+        
+        if (! keys %{$self->{'_scrub'}}) {
+                return 1;
+        }
+        
+        #
+        
+        my $rule = File::Find::Rule->new();
+        $rule->file();
+        
+        $rule->exec(sub {
+                            my ($shortname, $path, $fullname) = @_;
+                            
+                            # print "test $shortname\n";
+                            
+                            $shortname =~ /^\d{8}-(\d+)-/;
+                            my $id = $1;
+                            
+                            if (! exists($self->{'_scrub'}->{$id})) {
+                                    return 0;
+                            }
+                            
+                            if (grep/$shortname/,@{$self->{'_scrub'}->{$id}}) {
+                                    return 0;
+                            }
+                            
+                            return 1;
+                    });
+        
+        #
+        
+        foreach my $root ($rule->in($self->{'cfg'}->param("backup.photos_root"))) {
+                
+                if (! unlink($root)) {
+                        $self->log()->error("failed to unlink $root, $!");
+                        next;
+                }
+                
+                # next unlink empty parent directories
+                
+                my $dd_dir   = dirname($root);
+                my $mm_dir   = dirname($dd_dir);
+                my $yyyy_dir = dirname($mm_dir);
+                
+                foreach my $path ($dd_dir,$mm_dir,$yyyy_dir) {
+                        if (&_has_children($path)) {
+                                last;
+                        }
+                        
+                        else {
+                                if (! rmtree([$path],0,1)) {
+                                        $self->log()->error("failed to unlink, $path");
+                                        last;
+                                }
+                        }
+                }	
+        }
+        
+        #
+        
+        $self->{'_scrub'} = {};
+        return 1;
 }
 
 =head2 $obj->namespaces()
@@ -715,10 +726,10 @@ $OSNAME variable.
 =cut
 
 sub namespaces {
-    my $self = shift;
-    my %ns = %{$self->SUPER::namespaces()};
-    $ns{computer} = sprintf("x-urn:%s:",$OSNAME);
-    return (wantarray) ? %ns : \%ns;
+        my $self = shift;
+        my %ns = %{$self->SUPER::namespaces()};
+        $ns{computer} = sprintf("x-urn:%s:",$OSNAME);
+        return (wantarray) ? %ns : \%ns;
 }
 
 =head2 $obj->namespace_prefix($uri)
@@ -754,38 +765,38 @@ method and the method returns undef.
 =cut
 
 sub make_photo_triples {
-    my $self = shift;
-    my $data = shift;
-
-    my $triples = $self->SUPER::make_photo_triples($data);
-
-    if (! $triples) {
-	return undef;
-    }
-
-    my $user_id     = (getpwuid($EUID))[0];
-    my $os_uri      = sprintf("x-urn:%s:",$OSNAME);
-    my $user_uri    = $os_uri."user";
-
-    my $creator_uri = sprintf("x-urn:%s#%s",Sys::Hostname::FQDN::short(),$user_id);
-
-    push @$triples, [$user_uri,$self->uri_shortform("rdfs","subClassOf"),"http://xmlns.com/foaf/0.1/Person"];
-
-    foreach my $label (keys %{$self->{'__files'}}) {
-	
-	my $uri   = "file://".$self->{'__files'}->{$label};
-	my $photo = sprintf("%s%s/%d",$FLICKR_URL_PHOTOS,$data->{user_id},$data->{photo_id});
-
-	push @$triples, [$uri,$self->uri_shortform("rdfs","seeAlso"),$photo];
-	push @$triples, [$uri,$self->uri_shortform("dc","creator"),$creator_uri];
-	push @$triples, [$uri,$self->uri_shortform("dcterms","created"),&_w3cdtf()];
-    }
-
-    push @$triples, [$creator_uri, $self->uri_shortform("foaf","name"),(getpwuid($EUID))[6]];
-    push @$triples, [$creator_uri, $self->uri_shortform("foaf","nick"),$user_id];
-    push @$triples, [$creator_uri, $self->uri_shortform("rdf","type"),"computer:user"];
-
-    return $triples;
+        my $self = shift;
+        my $data = shift;
+        
+        my $triples = $self->SUPER::make_photo_triples($data);
+        
+        if (! $triples) {
+                return undef;
+        }
+        
+        my $user_id     = (getpwuid($EUID))[0];
+        my $os_uri      = sprintf("x-urn:%s:",$OSNAME);
+        my $user_uri    = $os_uri."user";
+        
+        my $creator_uri = sprintf("x-urn:%s#%s",Sys::Hostname::FQDN::short(),$user_id);
+        
+        push @$triples, [$user_uri,$self->uri_shortform("rdfs","subClassOf"),"http://xmlns.com/foaf/0.1/Person"];
+        
+        foreach my $label (keys %{$self->{'__files'}}) {
+                
+                my $uri   = "file://".$self->{'__files'}->{$label};
+                my $photo = sprintf("%s%s/%d",$FLICKR_URL_PHOTOS,$data->{user_id},$data->{photo_id});
+                
+                push @$triples, [$uri,$self->uri_shortform("rdfs","seeAlso"),$photo];
+                push @$triples, [$uri,$self->uri_shortform("dc","creator"),$creator_uri];
+                push @$triples, [$uri,$self->uri_shortform("dcterms","created"),&_w3cdtf()];
+        }
+        
+        push @$triples, [$creator_uri, $self->uri_shortform("foaf","name"),(getpwuid($EUID))[6]];
+        push @$triples, [$creator_uri, $self->uri_shortform("foaf","nick"),$user_id];
+        push @$triples, [$creator_uri, $self->uri_shortform("rdf","type"),"computer:user"];
+        
+        return $triples;
 }
 
 =head2 $obj->namespace_prefix($uri)
@@ -846,100 +857,100 @@ Returns a I<Log::Dispatch> object.
 # Defined in Net::Flickr::API
 
 sub _auth {
-    my $self = shift;
-
-    if (! $self->{'__auth'}) {
-	my $auth = $self->api_call({"method" => "flickr.auth.checkToken"});
-
-	if (! $auth) {
-	    return undef;
-	}
-
-	my $nsid = $auth->findvalue("/rsp/auth/user/\@nsid");
-
-	if (! $nsid) {
-	    $self->log()->error("unabled to determine ID for token");
-	    return undef;
-	}
-
-	$self->{'__auth'} = $auth;
-    }
-    
-    return $self->{'__auth'};
+        my $self = shift;
+        
+        if (! $self->{'__auth'}) {
+                my $auth = $self->api_call({"method" => "flickr.auth.checkToken"});
+                
+                if (! $auth) {
+                        return undef;
+                }
+                
+                my $nsid = $auth->findvalue("/rsp/auth/user/\@nsid");
+                
+                if (! $nsid) {
+                        $self->log()->error("unabled to determine ID for token");
+                        return undef;
+                }
+                
+                $self->{'__auth'} = $auth;
+        }
+        
+        return $self->{'__auth'};
 }
 
 sub _clean {
-    my $str = shift;
-
-    $str = lc($str);
-
-    $str =~ s/\.jpg$//;
-
-    # unidecode to convert everything to
-    # happy happy ASCII
-    
-    # see also : http://perladvent.org/2004/12th/
-
-    $str = unidecode(&_unescape(&_decode($str)));
-
-    $str =~ s/@/at/g;
-    $str =~ s/&/and/g;
-    $str =~ s/\*/star/g;
-
-    $str =~ s/[^a-z0-9\.\[\]-_]/ /ig;
-    $str =~ s/'//g;
-
-    # make all whitespace single spaces
-    $str =~ s/\s+/ /g;
-
-    # remove starting or trailing whitespace
-    $str =~ s/^\s+//;
-    $str =~ s/\s+$//;
-
-    # make all spaces underscores
-    $str =~ s/ /_/g;
-
-    return $str;
+        my $str = shift;
+        
+        $str = lc($str);
+        
+        $str =~ s/\.jpg$//;
+        
+        # unidecode to convert everything to
+        # happy happy ASCII
+        
+        # see also : http://perladvent.org/2004/12th/
+        
+        $str = unidecode(&_unescape(&_decode($str)));
+        
+        $str =~ s/@/at/g;
+        $str =~ s/&/and/g;
+        $str =~ s/\*/star/g;
+        
+        $str =~ s/[^a-z0-9\.\[\]-_]/ /ig;
+        $str =~ s/'//g;
+        
+        # make all whitespace single spaces
+        $str =~ s/\s+/ /g;
+        
+        # remove starting or trailing whitespace
+        $str =~ s/^\s+//;
+        $str =~ s/\s+$//;
+        
+        # make all spaces underscores
+        $str =~ s/ /_/g;
+        
+        return $str;
 }
 
 sub _decode {
-    my $str = shift;
-
-    if (! utf8::is_utf8($str)) {
-	$str = decode_utf8($str);
-    }
-
-    $str =~ s/(?:%([a-fA-F0-9]{2})%([a-fA-F0-9]{2}))/pack("U0U*",hex($1),hex($2))/eg;
-    return $str;
+        my $str = shift;
+        
+        if (! utf8::is_utf8($str)) {
+                $str = decode_utf8($str);
+        }
+        
+        $str =~ s/(?:%([a-fA-F0-9]{2})%([a-fA-F0-9]{2}))/pack("U0U*",hex($1),hex($2))/eg;
+        return $str;
 }
 
 # Borrowed from URI::Escape
 
 sub _unescape {
-    my $str = shift;
-
-    if (defined($str)) {
-	$str =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
-    }
-
-    return $str;
+        my $str = shift;
+        
+        if (defined($str)) {
+                $str =~ s/%([0-9A-Fa-f]{2})/chr(hex($1))/eg;
+        }
+        
+        return $str;
 }
 
 sub _has_children {
-    my $path = shift;
-    my $dh = DirHandle->new($path);
-    my $has = grep { $_ !~ /^\.+$/ } $dh->read();
-    return $has;
+        my $path = shift;
+        my $dh = DirHandle->new($path);
+        my $has = grep { $_ !~ /^\.+$/ } $dh->read();
+        return $has;
 }
 
 # Borrowed from LWP::Authen::Wsse
 
 sub _w3cdtf {
-    my ($sec, $min, $hour, $mday, $mon, $year) = gmtime();
-    $mon++; $year += 1900;
-
-    return sprintf("%04s-%02s-%02sT%02s:%02s:%02sZ",
-		   $year, $mon, $mday, $hour, $min, $sec);
+        my ($sec, $min, $hour, $mday, $mon, $year) = gmtime();
+        $mon++; $year += 1900;
+        
+        return sprintf("%04s-%02s-%02sT%02s:%02s:%02sZ",
+                       $year, $mon, $mday, $hour, $min, $sec);
 }
 
 =head1 EXAMPLES
@@ -1233,11 +1244,11 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
 =head1 VERSION
 
-2.3
+2.4
 
 =head1 DATE
 
-$Date: 2005/12/17 17:59:23 $
+$Date: 2005/12/18 04:18:35 $
 
 =head1 AUTHOR
 
