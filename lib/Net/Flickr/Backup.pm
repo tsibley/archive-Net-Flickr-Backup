@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.67 2005/12/18 04:18:35 asc Exp $
+# $Id: Backup.pm,v 1.71 2006/03/14 05:54:28 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.4';
+$Net::Flickr::Backup::VERSION = '2.6';
 
 =head1 NAME
 
@@ -263,14 +263,55 @@ sub init {
                         return 0;
                 }
         }
-        
+
+        #
+
+        $self->{'__callbacks'} = {};
+        $self->{'__cancel'} = 0;
+
+        #
+
         memoize("_clean");
         return 1;
 }
 
-=head1 PACKAGE METHODS YOU SHOULD CARE ABOUT
+=head1 OBJECTS METHODS YOU SHOULD CARE ABOUT
 
 =cut
+
+=head2 $obj->register_callback($name, \&func)
+
+Valid callback triggers are :
+
+=over 4
+
+=item * B<start_backup_queue>
+
+=item * B<finish_backup_queue>
+
+=item * B<start_backup_photo>
+
+=item * B<finish_backup_photo>
+
+=back
+
+Returns true or false, if I<$func> is not a valid code
+reference.
+
+=cut
+
+sub register_callback {
+        my $self = shift;
+        my $name = shift;
+        my $func = shift;
+
+        if (ref($func) ne "CODE") {
+                return 0;
+        }
+
+        $self->{'__callbacks'}->{$name} = $func;
+        return 1;
+}
 
 =head2 $obj->backup()
 
@@ -309,6 +350,10 @@ sub backup {
         
         while ($poll) {
                 
+                if ($self->{'__cancel'}) {
+                        last;
+                }
+
                 $search->{page} = $current_page;
                 
                 #
@@ -319,13 +364,25 @@ sub backup {
                 if (! $photos) {
                         return 0;
                 }
+
+                #
+
+                if (($current_page == 1) && ($self->_has_callback("start_backup_queue"))) {
+                        $self->_execute_callback("start_backup_queue",$photos);
+                }
                 
+                #
+
                 $num_pages = $photos->findvalue("/rsp/photos/\@pages");
                 
                 #
                 
                 foreach my $node ($photos->findnodes("/rsp/photos/photo")) {
                         
+                        if ($self->{'__cancel'}) {
+                                last;
+                        }
+
                         $self->{'__files'} = {};
                         
                         my $id      = $node->getAttribute("id");
@@ -335,8 +392,17 @@ sub backup {
                                                    $id,&_clean($node->getAttribute("title"))));
                         
                         #
+
+                        if ($self->_has_callback("start_backup_photo")) {
+                                $self->_execute_callback("start_backup_photo", $node);
+                        }
                         
-                        $self->backup_photo($id,$secret);
+                        my $ok = $self->backup_photo($id,$secret);
+
+                        if ($self->_has_callback("finish_backup_photo")) {
+                                $self->_execute_callback("finish_backup_photo", $node, $ok);
+                        }
+
                 }
                 
                 if ($current_page == $num_pages) {
@@ -347,8 +413,14 @@ sub backup {
         }
         
         #
+
+        if ($self->_has_callback("finish_backup_queue")) {
+                $self->_execute_callback("finish_backup_queue");
+        }
         
-        if ($self->{cfg}->param("backup.scrub_backups")) {
+        #
+        
+        if ((! $self->{'__cancel'}) && ($self->{cfg}->param("backup.scrub_backups"))) {
                 $self->log()->info("scrubbing backups");
                 $self->scrub();
         }
@@ -356,7 +428,7 @@ sub backup {
         return 1;
 }
 
-=head1 PACKAGE METHODS YOU MAY CARE ABOUT
+=head1 OBJECT METHODS YOU MAY CARE ABOUT
 
 =cut
 
@@ -430,6 +502,7 @@ sub backup_photo {
         #
         
         my $title = &_clean($data{title}) || "untitled";
+
         my $dt    = $data{taken};
         
         $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
@@ -603,7 +676,11 @@ sub scrub {
                             
                             $shortname =~ /^\d{8}-(\d+)-/;
                             my $id = $1;
-                            
+                         
+                            if (! $id) {
+                                    return 0;
+                            }
+
                             if (! exists($self->{'_scrub'}->{$id})) {
                                     return 0;
                             }
@@ -648,6 +725,18 @@ sub scrub {
         
         $self->{'_scrub'} = {};
         return 1;
+}
+
+=head2 $obj->cancel_backup()
+
+Cancel the backup process as soon as the current photo backup
+is complete.
+
+=cut
+
+sub cancel_backup {
+        my $self = shift;
+        $self->{'__cancel'} = 1;
 }
 
 =head2 $obj->namespaces()
@@ -897,7 +986,7 @@ sub _clean {
         $str =~ s/&/and/g;
         $str =~ s/\*/star/g;
         
-        $str =~ s/[^a-z0-9\.\[\]-_]/ /ig;
+        $str =~ s/[^a-z0-9\[\]-_]/ /ig;
         $str =~ s/'//g;
         
         # make all whitespace single spaces
@@ -905,8 +994,8 @@ sub _clean {
         
         # remove starting or trailing whitespace
         $str =~ s/^\s+//;
-        $str =~ s/\s+$//;
-        
+        $str =~ s/\s+$//;       
+
         # make all spaces underscores
         $str =~ s/ /_/g;
         
@@ -953,6 +1042,31 @@ sub _w3cdtf {
                        $year, $mon, $mday, $hour, $min, $sec);
 }
 
+sub _has_callback {
+        my $self = shift;
+        my $name = shift;
+
+        my $cb = $self->{'__callbacks'};
+
+        if (! exists($cb->{$name})) {
+                return 0;
+        }
+
+        elsif (ref($cb->{$name} ne "CODE")) {
+                return 0;
+        }
+
+        else {
+                return 1;
+        }
+}
+
+sub _execute_callback {
+        my $self = shift;
+        my $name = shift;
+        $self->{'__callbacks'}->{$name}->(@_);
+}
+
 =head1 EXAMPLES
 
 =cut
@@ -990,18 +1104,19 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
  <?xml version='1.0'?>    
  <rdf:RDF
   xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
   xmlns:a="http://www.w3.org/2000/10/annotation-ns"
   xmlns:acl="http://www.w3.org/2001/02/acls#"
   xmlns:exif="http://nwalsh.com/rdf/exif#"
   xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+  xmlns:cc="http://web.resource.org/cc/"
   xmlns:foaf="http://xmlns.com/foaf/0.1/"
   xmlns:exifi="http://nwalsh.com/rdf/exif-intrinsic#"
   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
-  xmlns:computer="x-urn:freebsd:"
-  xmlns:i="http://www.w3.org/2004/02/image-regions#"
   xmlns:flickr="x-urn:flickr:"
-  xmlns:dcterms="http://purl.org/dc/terms/">
+  xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:i="http://www.w3.org/2004/02/image-regions#">
 
   <flickr:photo rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528">
     <exif:isoSpeedRatings>1250</exif:isoSpeedRatings>
@@ -1011,7 +1126,6 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <acl:access>visbility</acl:access>
     <exif:colorSpace>sRGB</exif:colorSpace>
     <exif:dateTimeOriginal>2005:08:02 18:12:19</exif:dateTimeOriginal>
-    <dc:rights>All rights reserved.</dc:rights>
     <exif:shutterSpeedValue>4321/1000</exif:shutterSpeedValue>
     <dc:description></dc:description>
     <exif:exposureTime>0.05 sec (263/5260)</exif:exposureTime>
@@ -1025,11 +1139,19 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <dc:title>20050802(007).jpg</dc:title>
     <exif:fNumber>f/3.2</exif:fNumber>
     <acl:accessor>public</acl:accessor>
+    <geo:long>-122.417068</geo:long>
+    <geo:lat>37.7742</geo:lat>
+    <cc:license rdf:resource="http://creativecommons.org/licenses/by-nd/2.0/"/>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dc:subject rdf:resource="http://www.flickr.com/people/tags/usa"/>
-    <dc:subject rdf:resource="http://www.flickr.com/people/tags/california"/>
-    <dc:subject rdf:resource="http://www.flickr.com/people/tags/sanfrancisco"/>
-    <dc:subject rdf:resource="http://www.flickr.com/people/tags/cameraphone"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geolat377742"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/usa"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/california"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geolong122417068"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geotagged"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/photos/35034348999@N01/sets/1082058"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/groups/97155967@N00/pool"/>
     <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140939"/>
     <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942"/>
     <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140945"/>
@@ -1039,15 +1161,9 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656"/>
     <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1143239"/>
     <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1148950"/>
+    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/straup/30763528/#comment8400103"/>
+    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/straup/30763528/#comment8399772"/>
   </flickr:photo>
-
-  <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942">
-    <i:boundingBox>468 141 22 26</i:boundingBox>
-    <a:body>*sigh*</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </flickr:note>
 
   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_s.jpg">
     <dcterms:relation>Square</dcterms:relation>
@@ -1057,13 +1173,19 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </dcterms:StillImage>
 
-  <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656">
-    <i:boundingBox>357 193 81 28</i:boundingBox>
-    <a:body>eww!</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/california">
+    <skos:prefLabel>california</skos:prefLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/california"/>
+  </flickr:tag>
+
+  <flickr:comment rdf:about="http://www.flickr.com/photos/straup/30763528/#comment8400103">
+    <dc:identifier>6065-30763528-8400103</dc:identifier>
+    <dc:created>2005-08-02T18:52:23</dc:created>
+    <a:body>moooaahahaahahmooo</a:body>
+    <dc:creator rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </flickr:note>
+  </flickr:comment>
 
   <flickr:user rdf:about="http://www.flickr.com/people/44124415257@N01">
     <foaf:mbox_sha1sum>4f6f211958d5217ef0d10f7f5cd9a69cd66f217e</foaf:mbox_sha1sum>
@@ -1079,48 +1201,29 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </flickr:note>
 
-  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/usa">
-    <skos:prefLabel>usa</skos:prefLabel>
-    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/usa"/>
-  </flickr:tag>
-
   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140952">
     <i:boundingBox>9 205 145 55</i:boundingBox>
-    <a:body>Do you want my opinion? There's a love affair going on hereÅ‚ÄÅ¶ Anyway. Talking non sense. We all know Heather is committed to Flickr. She even only dresses at FlickrApparel. Did they say &amp;quot;No Logo&amp;quot;. Doh Dude.</a:body>
+    <a:body>Do you want my opinion? There's a love affair going on hereúÙÛ¶ Anyway. Talking non sense. We all know Heather is committed to Flickr. She even only dresses at FlickrApparel. Did they say &amp;quot;No Logo&amp;quot;. Doh Dude.</a:body>
     <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
     <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </flickr:note>
 
-  <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_m.jpg">
-    <dcterms:relation>Small</dcterms:relation>
-    <exifi:height>180</exifi:height>
-    <exifi:width>240</exifi:width>
-    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </dcterms:StillImage>
-
-  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone">
-    <skos:prefLabel>cameraphone</skos:prefLabel>
+  <flickr:photoset rdf:about="http://www.flickr.com/photos/35034348999@N01/sets/1082058">
+    <dc:description></dc:description>
+    <dc:title>Flickr</dc:title>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/cameraphone"/>
-  </flickr:tag>
-
-  <computer:user rdf:about="x-urn:dhclient#asc">
-    <foaf:name>Aaron Straup Cope</foaf:name>
-    <foaf:nick>asc</foaf:nick>
-  </computer:user>
+  </flickr:photoset>
 
   <flickr:user rdf:about="http://www.flickr.com/people/34427469121@N01">
-    <foaf:mbox_sha1sum>216d56f03517c68e527c5b970552a181980c4389</foaf:mbox_sha1sum>
+    <foaf:mbox_sha1sum>00d5b413e52b4d7d35dc982102c49e930a0ef631</foaf:mbox_sha1sum>
     <foaf:name>George Oates</foaf:name>
     <foaf:nick>George</foaf:nick>
   </flickr:user>
 
   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140946">
     <i:boundingBox>355 31 103 95</i:boundingBox>
-    <a:body>(YesÅ‚ÄÅ¶ I love you heather, you are my dream star)</a:body>
+    <a:body>(YesúÙÛ¶ I love you heather, you are my dream star)</a:body>
     <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
     <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
@@ -1130,21 +1233,126 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <rdfs:subClassOf rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
   </rdf:Description>
 
-  <rdf:Description rdf:about="file:///home/asc/photos/2005/08/02/20050802-30763528-20050802_007.jpg">
-    <dcterms:created>2005-09-25T15:16:28Z</dcterms:created>
-    <dc:creator rdf:resource="x-urn:dhclient#asc"/>
+  <flickr:tag rdf:about="http://www.flickr.com/tags/usa">
+    <skos:prefLabel>usa</skos:prefLabel>
+  </flickr:tag>
+
+  <flickr:tag rdf:about="http://www.flickr.com/tags/california">
+    <skos:prefLabel>california</skos:prefLabel>
+  </flickr:tag>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geotagged">
+    <skos:prefLabel>geotagged</skos:prefLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/geotagged"/>
+  </flickr:tag>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco">
+    <skos:prefLabel>san francisco</skos:prefLabel>
+    <skos:altLabel>sanfrancisco</skos:altLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/sanfrancisco"/>
+  </flickr:tag>
+
+  <flickr:user rdf:about="http://www.flickr.com/people/32373682187@N01">
+    <foaf:mbox_sha1sum>479d12dec2090705278d8b2af2c50ac2c46b94d4</foaf:mbox_sha1sum>
+    <foaf:name>heather powazek champ</foaf:name>
+    <foaf:nick>heather</foaf:nick>
+  </flickr:user>
+
+  <flickr:tag rdf:about="http://www.flickr.com/tags/geotagged">
+    <skos:prefLabel>geotagged</skos:prefLabel>
+  </flickr:tag>
+
+  <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285.jpg">
+    <dcterms:relation>Medium</dcterms:relation>
+    <exifi:height>375</exifi:height>
+    <exifi:width>500</exifi:width>
+    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
     <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+  </dcterms:StillImage>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geolat377742">
+    <skos:altLabel>geolat377742</skos:altLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <skos:prefLabel rdf:resource="geo:lat=37.7742"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/geolat377742"/>
+  </flickr:tag>
+
+  <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142648">
+    <i:boundingBox>202 224 50 50</i:boundingBox>
+    <a:body>dude! who did this?</a:body>
+    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
+    <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+  </flickr:note>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone">
+    <skos:prefLabel>cameraphone</skos:prefLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/cameraphone"/>
+  </flickr:tag>
+
+  <flickr:user rdf:about="http://www.flickr.com/people/35034348999@N01">
+    <foaf:mbox_sha1sum>a4d1b5e38db5e2ed4f847f9f09fd51cf59bc0d3f</foaf:mbox_sha1sum>
+    <foaf:name>Aaron Straup Cope</foaf:name>
+    <foaf:nick>straup</foaf:nick>
+  </flickr:user>
+
+  <rdf:Description rdf:about="x-urn:flickr:comment">
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
   </rdf:Description>
 
-  <rdf:Description rdf:about="file:///home/asc/photos/2005/08/02/20050802-30763528-20050802_007_m.jpg">
-    <dcterms:created>2005-09-25T15:16:28Z</dcterms:created>
-    <dc:creator rdf:resource="x-urn:dhclient#asc"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </rdf:Description>
+  <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942">
+    <i:boundingBox>468 141 22 26</i:boundingBox>
+    <a:body>*sigh*</a:body>
+    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
+    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+  </flickr:note>
 
-  <rdf:Description rdf:about="x-urn:freebsd:user">
-    <rdfs:subClassOf rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
-  </rdf:Description>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/usa">
+    <skos:prefLabel>usa</skos:prefLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/usa"/>
+  </flickr:tag>
+
+  <flickr:tag rdf:about="http://www.flickr.com/tags/cameraphone">
+    <skos:prefLabel>cameraphone</skos:prefLabel>
+  </flickr:tag>
+
+  <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656">
+    <i:boundingBox>357 193 81 28</i:boundingBox>
+    <a:body>eww!</a:body>
+    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
+    <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+  </flickr:note>
+
+  <flickr:tag rdf:about="http://www.flickr.com/tags/sanfrancisco">
+    <skos:prefLabel>sanfrancisco</skos:prefLabel>
+  </flickr:tag>
+
+  <flickr:comment rdf:about="http://www.flickr.com/photos/straup/30763528/#comment8399772">
+    <dc:identifier>6065-30763528-8399772</dc:identifier>
+    <dc:created>2005-08-02T18:44:52</dc:created>
+    <a:body>&amp;quot;you have been note-spammed by a passing mad cow...&amp;quot;
+:)</a:body>
+    <dc:creator rdf:resource="http://www.flickr.com/people/32373689382@N01"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+  </flickr:comment>
+
+  <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_m.jpg">
+    <dcterms:relation>Small</dcterms:relation>
+    <exifi:height>180</exifi:height>
+    <exifi:width>240</exifi:width>
+    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
+  </dcterms:StillImage>
+
+  <flickr:tag rdf:about="http://www.flickr.com/tags/geolong122417068">
+    <skos:prefLabel>geolong122417068</skos:prefLabel>
+  </flickr:tag>
 
   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1143239">
     <i:boundingBox>184 164 50 50</i:boundingBox>
@@ -1153,12 +1361,6 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <a:author rdf:resource="http://www.flickr.com/people/34427469121@N01"/>
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </flickr:note>
-
-  <rdf:Description rdf:about="file:///home/asc/photos/2005/08/02/20050802-30763528-20050802_007_s.jpg">
-    <dcterms:created>2005-09-25T15:16:28Z</dcterms:created>
-    <dc:creator rdf:resource="x-urn:dhclient#asc"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </rdf:Description>
 
   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_t.jpg">
     <dcterms:relation>Thumbnail</dcterms:relation>
@@ -1170,43 +1372,49 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140945">
     <i:boundingBox>433 103 50 50</i:boundingBox>
-    <a:body>(fuckÅ‚ÄÅ¶ fuckÅ‚ÄÅ¶)</a:body>
+    <a:body>(fuckúÙÛ¶ fuckúÙÛ¶)</a:body>
     <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
     <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </flickr:note>
 
-  <flickr:user rdf:about="http://www.flickr.com/people/32373682187@N01">
-    <foaf:mbox_sha1sum>62bf10c8d5b56623226689b7be924c64dee5e94a</foaf:mbox_sha1sum>
-    <foaf:name>heather powazek champ</foaf:name>
-    <foaf:nick>heather</foaf:nick>
-  </flickr:user>
-
   <rdf:Description rdf:about="x-urn:flickr:user">
     <rdfs:subClassOf rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
   </rdf:Description>
 
-  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/california">
-    <skos:prefLabel>california</skos:prefLabel>
+  <flickr:grouppool rdf:about="http://www.flickr.com/groups/97155967@N00/pool">
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/groups/97155967@N00"/>
+  </flickr:grouppool>
+
+  <flickr:user rdf:about="http://www.flickr.com/people/32373689382@N01">
+    <foaf:mbox_sha1sum>e0d207bb5643d4d7dd60e72d4ce2a94bae0e13b6</foaf:mbox_sha1sum>
+    <foaf:name>Boris Anthony</foaf:name>
+    <foaf:nick>bopuc</foaf:nick>
+  </flickr:user>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geolong122417068">
+    <skos:altLabel>geolong122417068</skos:altLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/california"/>
+    <skos:prefLabel rdf:resource="geo:long=-122.417068"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/geolong122417068"/>
   </flickr:tag>
 
-  <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285.jpg">
-    <dcterms:relation>Medium</dcterms:relation>
-    <exifi:height>375</exifi:height>
-    <exifi:width>500</exifi:width>
-    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </dcterms:StillImage>
+  <flickr:group rdf:about="http://www.flickr.com/groups/97155967@N00">
+    <dc:description></dc:description>
+    <dc:title>aaronland</dc:title>
+  </flickr:group>
 
-  <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142648">
-    <i:boundingBox>202 224 50 50</i:boundingBox>
-    <a:body>dude! who did this?</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-  </flickr:note>
+  <flickr:tag rdf:about="http://www.flickr.com/tags/geolat377742">
+    <skos:prefLabel>geolat377742</skos:prefLabel>
+  </flickr:tag>
+
+  <cc:License rdf:about="http://creativecommons.org/licenses/by-nd/2.0/">
+    <cc:requires rdf:resource="http://web.resource.org/cc/Notice"/>
+    <cc:requires rdf:resource="http://web.resource.org/cc/Attribution"/>
+    <cc:requires rdf:resource="http://web.resource.org/cc/ShareAlike"/>
+    <cc:permits rdf:resource="http://web.resource.org/cc/Reproduction"/>
+    <cc:permits rdf:resource="http://web.resource.org/cc/Distribution"/>
+  </cc:License>
 
   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_o.jpg">
     <dcterms:relation>Original</dcterms:relation>
@@ -1215,11 +1423,9 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </dcterms:StillImage>
 
-  <flickr:user rdf:about="http://www.flickr.com/people/35034348999@N01">
-    <foaf:mbox_sha1sum>a4d1b5e38db5e2ed4f847f9f09fd51cf59bc0d3f</foaf:mbox_sha1sum>
-    <foaf:name>Aaron</foaf:name>
-    <foaf:nick>straup</foaf:nick>
-  </flickr:user>
+  <rdf:Description rdf:about="x-urn:flickr:note">
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
+  </rdf:Description>
 
   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1148950">
     <i:boundingBox>342 197 28 33</i:boundingBox>
@@ -1229,26 +1435,15 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
     <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
   </flickr:note>
 
-  <rdf:Description rdf:about="x-urn:flickr:note">
-    <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
-  </rdf:Description>
-
-  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco">
-    <skos:prefLabel>san francisco</skos:prefLabel>
-    <skos:altLabel>sanfrancisco</skos:altLabel>
-    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://flickr.com/photos/tags/sanfrancisco"/>
-  </flickr:tag>
-
  </rdf:RDF>
 
 =head1 VERSION
 
-2.4
+2.6
 
 =head1 DATE
 
-$Date: 2005/12/18 04:18:35 $
+$Date: 2006/03/14 05:54:28 $
 
 =head1 AUTHOR
 
@@ -1270,7 +1465,7 @@ Please report all bugs via http://rt.cpan.org
 
 =head1 LICENSE
 
-Copyright (c) 2005 Aaron Straup Cope. All Rights Reserved.
+Copyright (c) 2005-2006 Aaron Straup Cope. All Rights Reserved.
 
 This is free software. You may redistribute it and/or
 modify it under the same terms as Perl itself.
