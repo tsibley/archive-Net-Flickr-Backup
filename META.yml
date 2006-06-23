@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name: Net-Flickr-Backup
-version: 2.6
+version: 2.7
 author:
   - Aaron Straup Cope E<lt>ascope@cpan.orgE<gt>
 abstract: OOP for backing up your Flickr photos locally
