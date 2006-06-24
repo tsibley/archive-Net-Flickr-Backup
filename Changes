@@ -6,9 +6,22 @@
 @prefix asc:     <http://aaronland.info/ns/changefile/> .
                                      
 <>
-        dc:identifier           "$Id: Changes,v 1.27 2006/06/23 14:45:01 asc Exp $" ;
+        dc:identifier           "$Id: Changes,v 1.29 2006/06/24 16:53:04 asc Exp $" ;
         dc:description          "Changes for Net::Flickr::Backup" ;
         dcterms:references      <http://aaronland.info/perl/net/flickr/backup/> .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.8.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.7.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.8" ;
+                        doap:created      "2006-06-24" ;
+                        ];
+        asc:changes     [
+                        asc:addition      "Added the ability to store limited metadata set in IPTC" ;
+                        asc:update        "Updated POD." ;
+                        ] .
 
 <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.7.tar.gz>        
         dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;

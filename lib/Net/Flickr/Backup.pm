@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.79 2006/06/23 14:45:01 asc Exp $
+# $Id: Backup.pm,v 1.83 2006/06/24 21:37:59 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.7';
+$Net::Flickr::Backup::VERSION = '2.8';
 
 =head1 NAME
 
@@ -208,6 +208,36 @@ If defined this string is applied as regular expression substitution to
 B<backup.photos_root>.
 
 Default is to append the B<file:/> URI protocol to a path.
+
+=back
+
+=head2 iptc
+
+=over 4
+
+=item * B<do_dump>
+
+Boolean.
+
+If true, then a limited set of metadata associated with a photo will be stored
+as IPTC information.
+
+A photo's title is stored as the IPTC B<Headline>, description as B<Caption/Abstract>
+and tags are stored in one or more B<Keyword> headers. Per the IPTC 7901 spec,
+all text is converted to the ISO-8859-1 character encoding. 
+
+For example :
+
+ exiv2 -pi /home/asc/photos/2006/06/20/20060620-171674319-mie.jpg
+ Iptc.Application2.RecordVersion              Short       1  2
+ Iptc.Application2.Keywords                   String     11  cameraphone
+ Iptc.Application2.Keywords                   String     15  "san francisco"
+ Iptc.Application2.Keywords                   String      5  filtr
+ Iptc.Application2.Keywords                   String      3  mie
+ Iptc.Application2.Keywords                   String     20  upcoming:event=77752
+ Iptc.Application2.Headline                   String      3  Mie  
+
+Default is false.
 
 =back
 
@@ -630,18 +660,45 @@ sub backup_photo {
         # Is that RDF in your pants?
         #
 
-        if (! $self->{cfg}->param("rdf.do_dump")) {
-                return 1;
+        if ($self->{cfg}->param("rdf.do_dump")) {
+                $self->store_rdf($info, $has_changed, $force);
         }
+
+        #
+        # JPEG/IPTC
+        #
+
+        if ($self->{cfg}->param("iptc.do_dump")) {
+                $self->store_iptc($info, $has_changed, $force);
+        }
+
+        return 1;
+}
+
+sub store_rdf {
+        my $self        = shift;
+        my $photo       = shift;
+        my $has_changed = shift;
+        my $force       = shift;
 
         my $rdf_root   = $self->{cfg}->param("rdf.rdfdump_root");
         my $rdf_inline = $self->{cfg}->param("rdf.rdfdump_inline");
         my $rdf_str    = "";
 
         if ((! $rdf_inline) && (! $rdf_root)) {
-                $rdf_root = $photos_root;
+                $rdf_root = $self->{cfg}->param("backup.photos_root");
         }
-                
+
+        my $id     = $photo->findvalue("/rsp/photo/\@id");
+        my $secret = $photo->findvalue("/rsp/photo/\@secret");
+        my $title  = $photo->findvalue("/rsp/photo/title") || "untitled";
+        $title     = &_clean($title);
+
+        my $dt = $photo->findvalue("/rsp/photo/dates/\@taken");
+        
+        $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        my ($yyyy,$mm,$dd) = ($1,$2,$3);	  	    
+
         my $meta_root  = File::Spec->catdir($rdf_root, $yyyy, $mm, $dd);
         my $meta_fname = sprintf("%04d%02d%02d-%d-%s.xml", $yyyy, $mm, $dd, $id, $title);	
         my $meta_bak   = File::Spec->catfile($meta_root, $meta_fname);
@@ -708,7 +765,7 @@ sub backup_photo {
         }
 
         #
-        #
+        # JPEG/RDF COM
         #
 
         if ($rdf_inline) {
@@ -720,22 +777,67 @@ sub backup_photo {
         return 1;
 }
 
+sub store_iptc {
+        my $self = shift;
+        my $photo       = shift;
+        my $has_changed = shift;
+        my $force       = shift;
+
+        if ((! $has_changed) && (! $force)) {
+                return 1;
+        }
+
+        return $self->store_iptc_inline($photo, $self->{'__files'}->{'Original'});
+}
+
+sub store_iptc_inline {
+        my $self     = shift;
+        my $photo    = shift;
+        my $original = shift;
+
+        my $im = $self->_jpeg_handler($original);
+
+        if (! $im) {
+                return 0;
+        }
+
+        my %iptc = ('Headline'         => $self->_iptcify($photo->findvalue("/rsp/photo/title")),
+                    'Caption/Abstract' => $self->_iptcify($photo->findvalue("/rsp/photo/description")),
+                    'Keywords'         => []);
+
+        my @tags = ();
+
+        foreach my $tag ($photo->findnodes("/rsp/photo/tags/tag")) {
+                my $raw = $self->_iptcify($tag->getAttribute("raw"));
+
+                if ($raw =~ /\s/) {
+                        $raw = "\"$raw\"";
+                }
+
+                push @{$iptc{'Keywords'}}, $raw;
+        }
+
+        if (! $im->set_app13_data(\%iptc, 'UPDATE', 'IPTC')) {
+                $self->log()->error("Failed to updated IPTC");
+                return 0;
+        }
+
+        if (! $im->save($original)) {
+                $self->log()->error("Failed store IPTC, $!");
+                return 0;
+        }
+
+        return 1;
+}
+
 sub store_rdf_inline {
         my $self     = shift;
         my $str_rdf  = shift;
         my $path_jpg = shift;
 
-        eval "require Image::MetaData::JPEG";
-        
-        if ($@) {
-                $self->log()->error("Failed to load Image::MetaData::JPEG, $@");
-                return 0;
-        }
-
-        my $im = Image::MetaData::JPEG->new($path_jpg, "COM");
+        my $im = $self->_jpeg_handler($path_jpg, "COM");
 
         if (! $im) {
-                $self->log()->error("Failed to read COM block for $path_jpg, " . Image::MetaData::JPEG::Error());
                 return 0;
         }
 
@@ -1264,6 +1366,32 @@ sub _mk_mindate {
         }
 }
 
+sub _jpeg_handler {
+        my $self = shift;
+        my $img  = shift;
+
+        eval "require Image::MetaData::JPEG";
+        
+        if ($@) {
+                $self->log()->error("Failed to load Image::MetaData::JPEG, $@");
+                return undef;
+        }
+
+        my $im = Image::MetaData::JPEG->new($img, @_);
+
+        if (! $im) {
+                $self->log()->error("Failed to read $img, " . Image::MetaData::JPEG::Error());
+                return undef;
+        }
+
+        return $im;
+}
+
+sub _iptcify {
+        my $self = shift;
+        return encode("iso-8859-1", &_decode($_[0])); 
+}
+
 =head1 EXAMPLES
 
 =cut
@@ -1645,11 +1773,11 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
 =head1 VERSION
 
-2.7
+2.8
 
 =head1 DATE
 
-$Date: 2006/06/23 14:45:01 $
+$Date: 2006/06/24 21:37:59 $
 
 =head1 AUTHOR
 

@@ -157,6 +157,31 @@ OPTIONS
 
         Default is to append the file:/ URI protocol to a path.
 
+  iptc
+    * do_dump
+        Boolean.
+
+        If true, then a limited set of metadata associated with a photo will
+        be stored as IPTC information.
+
+        A photo's title is stored as the IPTC Headline, description as
+        Caption/Abstract and tags are stored in one or more Keyword headers.
+        Per the IPTC 7901 spec, all text is converted to the ISO-8859-1
+        character encoding.
+
+        For example :
+
+         exiv2 -pi /home/asc/photos/2006/06/20/20060620-171674319-mie.jpg
+         Iptc.Application2.RecordVersion              Short       1  2
+         Iptc.Application2.Keywords                   String     11  cameraphone
+         Iptc.Application2.Keywords                   String     15  "san francisco"
+         Iptc.Application2.Keywords                   String      5  filtr
+         Iptc.Application2.Keywords                   String      3  mie
+         Iptc.Application2.Keywords                   String     20  upcoming:event=77752
+         Iptc.Application2.Headline                   String      3  Mie  
+
+        Default is false.
+
   search
     Any valid parameter that can be passed to the *flickr.photos.search*
     method except 'user_id' which is pre-filled with the user_id that
@@ -703,10 +728,10 @@ EXAMPLES
       </rdf:RDF>
 
 VERSION
-    2.7
+    2.8
 
 DATE
-    $Date: 2006/06/23 14:45:01 $
+    $Date: 2006/06/24 21:37:59 $
 
 AUTHOR
     Aaron Straup Cope <ascope@cpan.org>
