@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.84 2006/08/18 03:13:58 asc Exp $
+# $Id: Backup.pm,v 1.85 2006/08/24 04:10:12 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.9';
+$Net::Flickr::Backup::VERSION = '2.91';
 
 =head1 NAME
 
@@ -1773,11 +1773,11 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
 =head1 VERSION
 
-2.9
+2.91
 
 =head1 DATE
 
-$Date: 2006/08/18 03:13:58 $
+$Date: 2006/08/24 04:10:12 $
 
 =head1 AUTHOR
 
