@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.86 2006/09/01 15:56:17 asc Exp $
+# $Id: Backup.pm,v 1.87 2006/09/05 00:57:09 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.92';
+$Net::Flickr::Backup::VERSION = '2.93';
 
 =head1 NAME
 
@@ -438,10 +438,20 @@ sub backup {
                         $self->_execute_callback("start_backup_queue", $photos);
                 }
                 
-                #
-
                 $num_pages = $photos->findvalue("/rsp/photos/\@pages");
+
+                #
+                # Ensure that we assign a string and
+                # not an XML::XPath::Literal which whose
+                # overloaded magic will cause badnes
+                # when we compare (==) $current_page to
+                # $num_pages
+                #
                 
+                if (UNIVERSAL::can($num_pages, "value")) {
+                        $num_pages = $num_pages->value();
+                }
+
                 #
                 
                 foreach my $node ($photos->findnodes("/rsp/photos/photo")) {
@@ -1773,11 +1783,11 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
 =head1 VERSION
 
-2.92
+2.93
 
 =head1 DATE
 
-$Date: 2006/09/01 15:56:17 $
+$Date: 2006/09/05 00:57:09 $
 
 =head1 AUTHOR
 
