@@ -6,9 +6,34 @@
 @prefix asc:     <http://aaronland.info/ns/changefile/> .
                                      
 <>
-        dc:identifier           "$Id: Changes,v 1.33 2006/09/05 00:57:47 asc Exp $" ;
+        dc:identifier           "$Id: Changes,v 1.36 2006/10/20 03:11:01 asc Exp $" ;
         dc:description          "Changes for Net::Flickr::Backup" ;
         dcterms:references      <http://aaronland.info/perl/net/flickr/backup/> .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.95.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.94.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.95" ;
+                        doap:created      "2006-10-19" ;
+                        ];
+        asc:changes     [
+                        asc:update        "Require N:F:R 1.94 (add reverse geocoding and top support from geonames.org)" ;
+                        asc:update        "Updated POD" ;
+                        ] .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.94.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.93.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.94" ;
+                        doap:created      "2006-09-07" ;
+                        ];
+        asc:changes     [
+                        asc:bugfix        "Test $num_page for a 'value' method to prevent overloaded magic weirdness when comparing (==) against $current_page" ;
+                        ] .
 
 <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.93.tar.gz>        
         dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;

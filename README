@@ -157,6 +157,32 @@ OPTIONS
 
         Default is to append the file:/ URI protocol to a path.
 
+    * query_geonames
+        Boolean.
+
+        If true and a photo has geodata (latitude, longitude) associated
+        with it, then the geonames.org database will be queried for a
+        corresponding match. Data will be added as properties of the photo's
+        geo:Point description. For example :
+
+         <geo:Point rdf:about="http://www.flickr.com/photos/35034348999@N01/272880469#location">
+            <geo:long>-122.025151</geo:long>
+            <flickr:accuracy>16</flickr:accuracy>
+            <acl:access>visbility</acl:access>
+            <geo:lat>37.417839</geo:lat>
+            <acl:accessor>public</acl:accessor>
+            <geoname:Feature rdf:resource="http://ws.geonames.org/rdf?geonameId=5409655"/>
+         </geo:Point>
+
+         <geoname:Feature rdf:about="http://ws.geonames.org/rdf?geonameId=5409655">
+            <geoname:featureCode>PPLX</geoname:featureCode>
+            <geoname:countryCode>US</geoname:countryCode>
+            <geoname:regionCode>CA</geoname:regionCode>
+            <geoname:region>California</geoname:region>
+            <geoname:city>Santa Clara</geoname:city>
+            <geoname:gtopo30>2</geoname:gtopo30>
+         </geoname:Feature>
+
   iptc
     * do_dump
         Boolean.
@@ -728,10 +754,10 @@ EXAMPLES
       </rdf:RDF>
 
 VERSION
-    2.93
+    2.95
 
 DATE
-    $Date: 2006/09/05 00:57:09 $
+    $Date: 2006/10/20 03:11:01 $
 
 AUTHOR
     Aaron Straup Cope <ascope@cpan.org>
