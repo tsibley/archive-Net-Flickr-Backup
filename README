@@ -183,6 +183,25 @@ OPTIONS
             <geoname:gtopo30>2</geoname:gtopo30>
          </geoname:Feature>
 
+    * <query_trynt_color_api>
+        Boolean.
+
+        If true, the trynt colour extraction web service will be queried
+        with the URL for the "medium" sized photo. Each colour will be added
+        as it's own description, referenced from the photo's principal
+        description. For example :
+
+         <flickr:photo rdf:about="http://www.flickr.com/photos/35034348999@N01/299815039">
+           <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/299815039#c0c0c0"/>
+         </flickr:photo>
+
+         <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/299815039#c0c0c0">
+            <trynt:hexidecimal>c0c0c0</trynt:hexidecimal>
+            <trynt:count>654</trynt:count>
+         </trynt:color>
+
+        Default is false.
+
   iptc
     * do_dump
         Boolean.
@@ -213,7 +232,7 @@ OPTIONS
     method except 'user_id' which is pre-filled with the user_id that
     corresponds to the flickr.auth_token token.
 
-  modified since
+  modified_since
     String.
 
     This specifies a time-based limiting criteria for fetching photos.
@@ -320,6 +339,9 @@ OBJECT METHODS YOU MAY CARE ABOUT
 
     skos
         http://www.w3.org/2004/02/skos/core#
+
+    trynt
+        http://www.trynt.com#
 
     *Net::Flickr::Backup* adds the following namespaces :
 
@@ -754,10 +776,10 @@ EXAMPLES
       </rdf:RDF>
 
 VERSION
-    2.95
+    2.96
 
 DATE
-    $Date: 2006/10/20 03:11:01 $
+    $Date: 2006/11/19 22:02:17 $
 
 AUTHOR
     Aaron Straup Cope <ascope@cpan.org>

@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.91 2006/10/20 03:11:01 asc Exp $
+# $Id: Backup.pm,v 1.97 2006/11/19 22:02:17 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.95';
+$Net::Flickr::Backup::VERSION = '2.96';
 
 =head1 NAME
 
@@ -235,6 +235,25 @@ added as properties of the photo's geo:Point description. For example :
     <geoname:gtopo30>2</geoname:gtopo30>
  </geoname:Feature>
 
+=item * <query_trynt_color_api>                                                                                                                                                                        
+                                                                                                                                                                                                       
+Boolean.                                                                                                                                                                                               
+                                                                                                                                                                                                       
+If true, the trynt colour extraction web service will be queried with the URL                                                                                                                          
+for the "medium" sized photo. Each colour will be added as it's own description,                                                                                                                       
+referenced from the photo's principal description. For example :                                                                                                                                       
+                                                                                                                                                                                                       
+ <flickr:photo rdf:about="http://www.flickr.com/photos/35034348999@N01/299815039">
+   <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/299815039#c0c0c0"/>
+ </flickr:photo>
+
+ <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/299815039#c0c0c0">
+    <trynt:hexidecimal>c0c0c0</trynt:hexidecimal>
+    <trynt:count>654</trynt:count>
+ </trynt:color>
+
+Default is false.
+
 =back
 
 =head2 iptc
@@ -273,7 +292,7 @@ Any valid parameter that can be passed to the I<flickr.photos.search>
 method B<except> 'user_id' which is pre-filled with the user_id that
 corresponds to the B<flickr.auth_token> token.
 
-=head2 modified since
+=head2 modified_since
 
 String.
 
@@ -307,6 +326,7 @@ Fetch photos that have been modified in the last B<(n)> months.
 use utf8;
 use Encode;
 use English;
+use Data::Dumper;
 
 use Text::Unidecode;
 
@@ -348,7 +368,7 @@ sub init {
         my $cfg  = shift;
         
         if (! $self->SUPER::init($cfg)) {
-                return 0;
+                return undef;
         }
         
         #
@@ -362,14 +382,15 @@ sub init {
                 
                 if (! keys %$test) {
                         $self->log()->error("unable to find any properties for $block block in config file");
-                        return 0;
+                        return undef;
                 }
         }
 
         #
 
-        $self->{'__callbacks'} = {};
-        $self->{'__cancel'} = 0;
+        $self->{'__lastmod_since'} = 0;
+        $self->{'__callbacks'}     = {};
+        $self->{'__cancel'}        = 0;
 
         #
 
@@ -415,7 +436,7 @@ sub backup {
         my $poll_meth = "flickr.photos.search";
         my $poll_args = $self->{cfg}->param(-block=>"search");
 
-        $poll_args->{user_id} = $auth->findvalue("/rsp/auth/user/\@nsid");
+        $poll_args->{'user_id'} = $auth->find("/rsp/auth/user/\@nsid")->string_value();
 
         if (my $min_date = $self->{cfg}->param("search.modified_since")) {
 
@@ -430,7 +451,15 @@ sub backup {
 
                 $poll_meth = "flickr.photos.recentlyUpdated";
                 $poll_args = {min_date => $min_date};
+
+                $self->{'__lastmod_since'} = $min_date;
         }
+
+        #
+        #
+        #
+
+        $self->log()->info("search args ($poll_meth) : " . Dumper($poll_args));
 
         #
         #
@@ -464,19 +493,7 @@ sub backup {
                         $self->_execute_callback("start_backup_queue", $photos);
                 }
                 
-                $num_pages = $photos->findvalue("/rsp/photos/\@pages");
-
-                #
-                # Ensure that we assign a string and
-                # not an XML::XPath::Literal which whose
-                # overloaded magic will cause badnes
-                # when we compare (==) $current_page to
-                # $num_pages
-                #
-                
-                if (UNIVERSAL::can($num_pages, "value")) {
-                        $num_pages = $num_pages->value();
-                }
+                $num_pages = $photos->find("/rsp/photos/\@pages")->string_value();
 
                 #
                 
@@ -500,7 +517,7 @@ sub backup {
                                 $self->_execute_callback("start_backup_photo", $node);
                         }
                         
-                        my $ok = $self->backup_photo($id,$secret);
+                        my $ok = $self->backup_photo($id, $secret);
 
                         if ($self->_has_callback("finish_backup_photo")) {
                                 $self->_execute_callback("finish_backup_photo", $node, $ok);
@@ -587,7 +604,7 @@ sub backup_photo {
         #
         
         my %data = (photo_id => $id,
-                    user_id  => $img->findvalue("owner/\@nsid"),
+                    user_id  => $img->find("owner/\@nsid")->string_value(),
                     title    => $img->find("title")->string_value(),
                     taken    => $dates->getAttribute("taken"),
                     posted   => $dates->getAttribute("posted"),
@@ -615,6 +632,8 @@ sub backup_photo {
         
         my $fetch_cfg = $self->{cfg}->param(-block=>"backup");
         
+        my $files_modified = 0;
+
         foreach my $label (keys %FETCH_SIZES) {
                 
                 my $fetch_param = "fetch_".lc($label);
@@ -646,6 +665,7 @@ sub backup_photo {
                 push @{$self->{'_scrub'}->{$id}}, $img_fname;
                 
                 my $img_bak = File::Spec->catfile($img_root, $img_fname);
+                $self->{'__files'}->{$label} = $img_bak;
                 
                 #
                 
@@ -685,17 +705,63 @@ sub backup_photo {
                 
                 #
                 
-                $self->{'__files'}->{$label} = $img_bak;
+                $files_modified ++;
         }
-        
-        if (! keys %{$self->{'__files'}}) {
-                return 1;
+
+        #
+        # Do we need to keep going...
+        #
+
+        $has_changed = ($files_modified) ? 1 : 0;
+
+        $self->log()->info("has changed (filemod) : $has_changed");
+
+        if ((! $has_changed) && (! $force)) {
+
+                my $lastmod = $self->{'__lastmod_since'};
+                $self->log()->info("last mod : $lastmod");
+
+                if (($lastmod) && ($last_update >= $lastmod)) {
+                        $has_changed = 1;
+                        $self->log()->info("has changed (update) : $has_changed ($last_update - $lastmod)");
+                }
+
+                #
+                # Ensure the RDF file is there and up to date
+                #
+
+                if (! $self->{cfg}->param("rdf.rdfdump_inline")) {
+                        
+                        my $dump = $self->path_rdf_dumpfile($info);
+                        $self->log()->info("test for rdf dump : $dump");
+
+                        if (($has_changed) && (-f $dump)) {
+
+                                my $dumpmod = (stat($dump))[9];
+                                $self->log()->info("rdf dump : $dump");
+
+                                if ($dumpmod >= $lastmod) {
+                                        $has_changed = 0;
+                                        $self->log()->info("has changed (rdf) : $has_changed ($last_update - $dumpmod)");
+                                }
+                        }
+
+                        else {
+                                if (! -f $dump) {
+                                        $self->log()->info("rdf dump does not exist : $dump");
+                                        $has_changed = 1;
+                                }
+                        }
+                }
+
         }
+
+        $self->log()->info("has changed (final) : $has_changed");
 
         #
         # Is that RDF in your pants?
         #
-
+        
         if ($self->{cfg}->param("rdf.do_dump")) {
                 $self->store_rdf($info, $has_changed, $force);
         }
@@ -725,19 +791,10 @@ sub store_rdf {
                 $rdf_root = $self->{cfg}->param("backup.photos_root");
         }
 
-        my $id     = $photo->findvalue("/rsp/photo/\@id");
-        my $secret = $photo->findvalue("/rsp/photo/\@secret");
-        my $title  = $photo->findvalue("/rsp/photo/title") || "untitled";
-        $title     = &_clean($title);
+        my $secret = $photo->find("/rsp/photo/\@secret")->string_value();
+        my $id     = $photo->find("/rsp/photo/\@id")->string_value();
 
-        my $dt = $photo->findvalue("/rsp/photo/dates/\@taken");
-        
-        $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
-        my ($yyyy,$mm,$dd) = ($1,$2,$3);	  	    
-
-        my $meta_root  = File::Spec->catdir($rdf_root, $yyyy, $mm, $dd);
-        my $meta_fname = sprintf("%04d%02d%02d-%d-%s.xml", $yyyy, $mm, $dd, $id, $title);	
-        my $meta_bak   = File::Spec->catfile($meta_root, $meta_fname);
+        my $meta_bak   = $self->path_rdf_dumpfile($photo);
         my $meta_str   = "";
 
         if ((! $force) && (! $has_changed) && (! $rdf_inline) && (-f $meta_bak)) {
@@ -749,6 +806,8 @@ sub store_rdf {
         #
         #
         #
+
+        my $meta_root = dirname($meta_bak);
 
         if ((! -d $meta_root) && (! $rdf_inline)) {
                 
@@ -795,7 +854,7 @@ sub store_rdf {
                 return 0;
         }
         
-        if (! $fh->close()) {
+        if ((! $rdf_inline) && (! $fh->close())) {
                 $self->log()->error("failed to write '$meta_bak', $!");
                 return 0;
         }
@@ -837,8 +896,8 @@ sub store_iptc_inline {
                 return 0;
         }
 
-        my %iptc = ('Headline'         => $self->_iptcify($photo->findvalue("/rsp/photo/title")),
-                    'Caption/Abstract' => $self->_iptcify($photo->findvalue("/rsp/photo/description")),
+        my %iptc = ('Headline'         => $self->_iptcify($photo->find("/rsp/photo/title")->string_value()),
+                    'Caption/Abstract' => $self->_iptcify($photo->find("/rsp/photo/description")->string_value()),
                     'Keywords'         => []);
 
         my @tags = ();
@@ -1094,6 +1153,10 @@ http://www.w3.org/2000/01/rdf-schema#
 
 http://www.w3.org/2004/02/skos/core#
 
+=item B<trynt>
+
+http://www.trynt.com#
+
 =back
 
 I<Net::Flickr::Backup> adds the following namespaces :
@@ -1240,6 +1303,35 @@ Returns a I<Log::Dispatch> object.
 
 # Defined in Net::Flickr::API
 
+sub path_rdf_dumpfile {
+        my $self  = shift;
+        my $photo = shift;
+
+        my $rdf_root   = $self->{cfg}->param("rdf.rdfdump_root");
+        my $rdf_inline = $self->{cfg}->param("rdf.rdfdump_inline");
+        my $rdf_str    = "";
+
+        if ((! $rdf_inline) && (! $rdf_root)) {
+                $rdf_root = $self->{cfg}->param("backup.photos_root");
+        }
+
+        my $id     = $photo->find("/rsp/photo/\@id")->string_value();
+        my $secret = $photo->find("/rsp/photo/\@secret")->string_value();
+        my $title  = $photo->find("/rsp/photo/title")->string_value() || "untitled";
+        $title     = &_clean($title);
+
+        my $dt = $photo->find("/rsp/photo/dates/\@taken")->string_value();
+        
+        $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
+        my ($yyyy,$mm,$dd) = ($1,$2,$3);	  	    
+
+        my $meta_root  = File::Spec->catdir($rdf_root, $yyyy, $mm, $dd);
+        my $meta_fname = sprintf("%04d%02d%02d-%d-%s.xml", $yyyy, $mm, $dd, $id, $title);	
+        my $meta_path  = File::Spec->catfile($meta_root, $meta_fname);
+
+        return $meta_path;
+}
+
 sub _auth {
         my $self = shift;
         
@@ -1250,7 +1342,7 @@ sub _auth {
                         return undef;
                 }
                 
-                my $nsid = $auth->findvalue("/rsp/auth/user/\@nsid");
+                my $nsid = $auth->find("/rsp/auth/user/\@nsid")->string_value();
                 
                 if (! $nsid) {
                         $self->log()->error("unabled to determine ID for token");
@@ -1809,11 +1901,11 @@ This is an example of an RDF dump for a photograph backed up from Flickr :
 
 =head1 VERSION
 
-2.95
+2.96
 
 =head1 DATE
 
-$Date: 2006/10/20 03:11:01 $
+$Date: 2006/11/19 22:02:17 $
 
 =head1 AUTHOR
 
