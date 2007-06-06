@@ -6,9 +6,24 @@
 @prefix asc:     <http://aaronland.info/ns/changefile/> .
                                      
 <>
-        dc:identifier           "$Id: Changes,v 1.41 2006/11/19 22:02:17 asc Exp $" ;
+        dc:identifier           "$Id: Changes,v 1.45 2007/06/06 05:13:01 asc Exp $" ;
         dc:description          "Changes for Net::Flickr::Backup" ;
         dcterms:references      <http://aaronland.info/perl/net/flickr/backup/> .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.97.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.96.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.97" ;
+                        doap:created      "2007-06-05" ;
+                        ];
+        asc:changes     [
+                        asc:bugfix        "Update POD to make note of N:F:API handler requirements (RT # 27548)" ;
+                        asc:bugfix        "Update POD to use 'flickr' config section, rather than 'flick' (RT # 27547)" ;
+                        asc:update        "Replace Sys::Hostname::FQDN with Sys::Hostname (RT # 27459)" ; 
+                        asc:update        "Update to use N:F:RDF 2.0 (add support for machine tags and Flickr place names)" ;
+                        ] .
 
 <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.96.tar.gz>        
         dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;

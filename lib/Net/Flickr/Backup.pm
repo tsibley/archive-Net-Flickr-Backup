@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.97 2006/11/19 22:02:17 asc Exp $
+# $Id: Backup.pm,v 1.101 2007/06/06 05:16:09 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.96';
+$Net::Flickr::Backup::VERSION = '2.97';
 
 =head1 NAME
 
@@ -35,7 +35,7 @@ OOP for backing up your Flickr photos locally.
 Options are passed to Net::Flickr::Backup using a Config::Simple object or
 a valid Config::Simple config file. Options are grouped by "block".
 
-=head2 flick
+=head2 flickr
 
 =over 4
 
@@ -56,6 +56,20 @@ A valid Flickr Auth API secret key.
 String. I<required>
 
 A valid Flickr Auth API token.
+
+The B<api_handler> defines which XML/XPath handler to use to process API responses.
+
+=over 4 
+
+=item * B<LibXML>
+
+Use XML::LibXML.
+
+=item * B<XPath>
+
+Use XML::XPath.
+
+=back
 
 =back
 
@@ -341,8 +355,8 @@ use IO::AtomicFile;
 use IO::Scalar;
 use LWP::Simple;
 
-use Sys::Hostname::FQDN;
 use Memoize;
+use Sys::Hostname;
 
 Readonly::Hash my %FETCH_SIZES => ('Original' => '',
 				   'Medium'   => '_m',
@@ -391,6 +405,8 @@ sub init {
         $self->{'__lastmod_since'} = 0;
         $self->{'__callbacks'}     = {};
         $self->{'__cancel'}        = 0;
+
+        $self->{'__hostname'} = undef;
 
         #
 
@@ -782,6 +798,10 @@ sub store_rdf {
         my $photo       = shift;
         my $has_changed = shift;
         my $force       = shift;
+
+        if (! $force){
+                $force = $self->{'cfg'}->param("rdf.force");
+        }
 
         my $rdf_root   = $self->{cfg}->param("rdf.rdfdump_root");
         my $rdf_inline = $self->{cfg}->param("rdf.rdfdump_inline");
@@ -1225,7 +1245,7 @@ sub make_photo_triples {
         my $os_uri      = sprintf("x-urn:%s:",$OSNAME);
         my $user_uri    = $os_uri."user";
         
-        my $creator_uri = sprintf("x-urn:%s#%s", Sys::Hostname::FQDN::short(), $user_id);
+        my $creator_uri = sprintf("x-urn:%s#%s", $self->hostname_short(), $user_id);
         
         push @$triples, [$user_uri, $self->uri_shortform("rdfs", "subClassOf"), "http://xmlns.com/foaf/0.1/Person"];
         
@@ -1244,6 +1264,20 @@ sub make_photo_triples {
         push @$triples, [$creator_uri, $self->uri_shortform("rdf", "type"), "computer:user"];
         
         return $triples;
+}
+
+sub hostname_short {
+        my $self = shift;
+
+        if ($self->{'__hostname'}){
+                return $self->{'__hostname'};
+        }
+
+        my @parts = split(/\./, hostname());
+        my $short = $parts[0];                
+        
+        $self->{'__hostname'} = $short;
+        return $short;
 }
 
 =head2 $obj->namespace_prefix($uri)
@@ -1533,6 +1567,7 @@ with 'cameraphone' from Flickr
  api_key=asd6234kjhdmbzcxi6e323
  api_secret=s00p3rs3k3t
  auth_token=123-omgwtf4u
+ api_handler=LibXML
 
  [search]
  tags=cameraphone
@@ -1551,361 +1586,391 @@ with 'cameraphone' from Flickr
 
 =head2 RDF
 
-This is an example of an RDF dump for a photograph backed up from Flickr :
+This is an example of an RDF dump for a photograph backed up from
+Flickr (using Net::Flickr::RDF) :
 
 
  <?xml version='1.0'?>    
-  <rdf:RDF
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
-   xmlns:a="http://www.w3.org/2000/10/annotation-ns"
-   xmlns:acl="http://www.w3.org/2001/02/acls#"
-   xmlns:exif="http://nwalsh.com/rdf/exif#"
-   xmlns:skos="http://www.w3.org/2004/02/skos/core#"
-   xmlns:cc="http://web.resource.org/cc/"
-   xmlns:foaf="http://xmlns.com/foaf/0.1/"
-   xmlns:exifi="http://nwalsh.com/rdf/exif-intrinsic#"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
-   xmlns:flickr="x-urn:flickr:"
-   xmlns:dcterms="http://purl.org/dc/terms/"
-   xmlns:i="http://www.w3.org/2004/02/image-regions#"
-   >
+ <rdf:RDF
+  xmlns:geoname="http://www.geonames.org/onto#"
+  xmlns:a="http://www.w3.org/2000/10/annotation-ns"
+  xmlns:ph="http://www.machinetags.org/wiki/ph#camera"
+  xmlns:filtr="http://www.machinetags.org/wiki/filtr#process"
+  xmlns:nfr_geo="http://www.machinetags.org/wiki/geo#debug"
+  xmlns:place="x-urn:flickr:place:"
+  xmlns:exif="http://nwalsh.com/rdf/exif#"
+  xmlns:trynt="http://www.trynt.com#"
+  xmlns:mt="x-urn:flickr:machinetag:"
+  xmlns:exifi="http://nwalsh.com/rdf/exif-intrinsic#"
+  xmlns:geonames="http://www.machinetags.org/wiki/geonames#feature"
+  xmlns:dcterms="http://purl.org/dc/terms/"
+  xmlns:dc="http://purl.org/dc/elements/1.1/"
+  xmlns:geo="http://www.w3.org/2003/01/geo/wgs84_pos#"
+  xmlns:acl="http://www.w3.org/2001/02/acls#"
+  xmlns:skos="http://www.w3.org/2004/02/skos/core#"
+  xmlns:foaf="http://xmlns.com/foaf/0.1/"
+  xmlns:rdfs="http://www.w3.org/2000/01/rdf-schema#"
+  xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+  xmlns:flickr="x-urn:flickr:"
+ >
 
-   <flickr:photo rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528">
-    <dc:description></dc:description>
-    <geo:long>-122.417068</geo:long>
-    <acl:access>visbility</acl:access>
-    <geo:lat>37.7742</geo:lat>
-    <dc:created>2005-08-02T18:12:19-0700</dc:created>
-    <dc:title>20050802(007).jpg</dc:title>
-    <acl:accessor>public</acl:accessor>
-    <dc:dateSubmitted>2005-08-02T18:16:20-0700</dc:dateSubmitted>
-    <cc:license rdf:resource="http://creativecommons.org/licenses/by-nd/2.0/"/>
-    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geolat377742"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/usa"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/california"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geolong122417068"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone"/>
-    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geotagged"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/photos/35034348999@N01/sets/1082058"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/groups/97155967@N00/pool"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140939"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140945"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140946"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140952"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142648"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1143239"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#note-1148950"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/straup/30763528/#comment8400103"/>
-    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/straup/30763528/#comment8399772"/>
-   </flickr:photo>
-
-   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_s.jpg">
-    <dcterms:relation>Square</dcterms:relation>
-    <exifi:height>75</exifi:height>
-    <exifi:width>75</exifi:width>
-    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#exif"/>
-   </dcterms:StillImage>
-
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/california">
-    <skos:prefLabel>california</skos:prefLabel>
-    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/california"/>
-   </flickr:tag>
-
-   <flickr:comment rdf:about="http://www.flickr.com/photos/straup/30763528/#comment8400103">
-    <dc:identifier>6065-30763528-8400103</dc:identifier>
-    <dc:created>2005-08-02T18:52:23</dc:created>
-    <a:body>moooaahahaahahmooo</a:body>
-    <dc:creator rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:comment>
-
-   <flickr:user rdf:about="http://www.flickr.com/people/44124415257@N01">
-    <foaf:mbox_sha1sum>b2310525591ca71b1cb9c2e3226dec1765d76c1e</foaf:mbox_sha1sum>
+  <flickr:user rdf:about="http://www.flickr.com/people/72238590@N00">
+    <foaf:mbox_sha1sum>2fc2c76d7634d1a6446b1898bf5471205ed3d0cb</foaf:mbox_sha1sum>
     <foaf:name></foaf:name>
-    <foaf:nick>karlcow</foaf:nick>
-   </flickr:user>
+    <foaf:nick>thincvox</foaf:nick>
+  </flickr:user>
 
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140939">
-    <i:boundingBox>326 181 97 25</i:boundingBox>
-    <a:body>Did you see that this shirt makes me a beautiful breast?</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
-
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140952">
-    <i:boundingBox>9 205 145 55</i:boundingBox>
-    <a:body>Do you want my opinion? There's a love affair going on here… Anyway. Talking non sense. We all know Heather is committed to Flickr. She even only dresses at FlickrApparel. Did they say &amp;quot;No Logo&amp;quot;. Doh Dude.</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-
-   </flickr:note>
-
-   <flickr:photoset rdf:about="http://www.flickr.com/photos/35034348999@N01/sets/1082058">
-    <dc:description></dc:description>
-    <dc:title>Flickr</dc:title>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/filtr:process=filtr">
+    <skos:altLabel>filtr</skos:altLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-   </flickr:photoset>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/filtr:process=filtr"/>
+    <skos:prefLabel rdf:resource="filtr:process=filtr"/>
+  </flickr:tag>
 
-   <flickr:user rdf:about="http://www.flickr.com/people/34427469121@N01">
-    <foaf:mbox_sha1sum>00d5b413e52b4d7d35dc982102c49e930a0ef631</foaf:mbox_sha1sum>
-    <foaf:name>George Oates</foaf:name>
-    <foaf:nick>George</foaf:nick>
-   </flickr:user>
+  <geoname:Feature rdf:about="http://ws.geonames.org/rdf?geonameId=5400754">
+    <geoname:featureCode>PPLX</geoname:featureCode>
+    <geoname:countryCode>US</geoname:countryCode>
+    <geoname:regionCode>CA</geoname:regionCode>
+    <geoname:gtopo30>58</geoname:gtopo30>
+    <geoname:region>State of California</geoname:region>
+    <geoname:city>San Francisco County</geoname:city>
+    <dc:isReferencedBy rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </geoname:Feature>
 
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140946">
-    <i:boundingBox>355 31 103 95</i:boundingBox>
-    <a:body>(Yes… I love you heather, you are my dream star)</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
+  <flickr:machinetag rdf:about="http://www.machinetags.org/wiki/geonames#feature">
+    <mt:predicate>feature</mt:predicate>
+    <mt:namespace>geonames</mt:namespace>
+    <dc:isReferencedBy rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:machinetag>
 
-   <rdf:Description rdf:about="x-urn:flickr:tag">
+  <dcterms:StillImage rdf:about="http://farm1.static.flickr.com/232/522214395_d2841bdbb0_o.jpg">
+    <dcterms:relation>Original</dcterms:relation>
+    <exifi:height>1944</exifi:height>
+    <exifi:width>2592</exifi:width>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#exif"/>
+  </dcterms:StillImage>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/cameraphone">
+    <skos:prefLabel>cameraphone</skos:prefLabel>
+  </flickr:tag>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/filtr">
+    <skos:prefLabel>filtr</skos:prefLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/filtr"/>
+  </flickr:tag>
+
+  <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#exif">
+    <exif:flash>Flash did not fire, auto mode</exif:flash>
+    <exif:digitalZoomRatio>100/100</exif:digitalZoomRatio>
+    <exif:isoSpeedRatings>100</exif:isoSpeedRatings>
+    <exif:pixelXDimension>2592</exif:pixelXDimension>
+    <exif:apertureValue>297/100</exif:apertureValue>
+    <exif:pixelYDimension>1944</exif:pixelYDimension>
+    <exif:focalLength>5.6 mm</exif:focalLength>
+    <exif:dateTimeDigitized>2007-05-30T15:10:01PDT</exif:dateTimeDigitized>
+    <exif:colorSpace>sRGB</exif:colorSpace>
+    <exif:fNumber>f/2.8</exif:fNumber>
+    <exif:dateTimeOriginal>2007-05-30T15:10:01PDT</exif:dateTimeOriginal>
+    <exif:shutterSpeedValue>4351/1000</exif:shutterSpeedValue>
+    <exif:exposureTime>0.049 sec (49/1000)</exif:exposureTime>
+  </rdf:Description>
+
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#604040">
+    <trynt:hexidecimal>604040</trynt:hexidecimal>
+    <trynt:count>472</trynt:count>
+  </trynt:color>
+
+  <rdf:Description rdf:about="x-urn:flickr:tag">
     <rdfs:subClassOf rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
-   </rdf:Description>
+  </rdf:Description>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/usa">
-    <skos:prefLabel>usa</skos:prefLabel>
-   </flickr:tag>
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#000000">
+    <trynt:hexidecimal>000000</trynt:hexidecimal>
+    <trynt:count>4841</trynt:count>
+  </trynt:color>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/california">
-    <skos:prefLabel>california</skos:prefLabel>
-   </flickr:tag>
-
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geotagged">
-    <skos:prefLabel>geotagged</skos:prefLabel>
-    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/geotagged"/>
-   </flickr:tag>
-
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco">
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco">
     <skos:prefLabel>san francisco</skos:prefLabel>
     <skos:altLabel>sanfrancisco</skos:altLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/sanfrancisco"/>
-   </flickr:tag>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/sanfrancisco"/>
+  </flickr:tag>
 
-   <flickr:user rdf:about="http://www.flickr.com/people/32373682187@N01">
-    <foaf:mbox_sha1sum>479d12dec2090705278d8b2af2c50ac2c46b94d4</foaf:mbox_sha1sum>
-    <foaf:name>heather powazek champ</foaf:name>
-    <foaf:nick>heather</foaf:nick>
-   </flickr:user>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/sanfrancisco">
+    <skos:prefLabel>sanfrancisco</skos:prefLabel>
+  </flickr:tag>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/geotagged">
-    <skos:prefLabel>geotagged</skos:prefLabel>
-   </flickr:tag>
-
-   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285.jpg">
+  <dcterms:StillImage rdf:about="http://farm1.static.flickr.com/232/522214395_ed16f959a2.jpg">
     <dcterms:relation>Medium</dcterms:relation>
     <exifi:height>375</exifi:height>
     <exifi:width>500</exifi:width>
-    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#exif"/>
-   </dcterms:StillImage>
+    <dcterms:isVersionOf rdf:resource="http://farm1.static.flickr.com/232/522214395_d2841bdbb0_o.jpg"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#exif"/>
+  </dcterms:StillImage>
 
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geolat377742">
-    <skos:altLabel>geolat377742</skos:altLabel>
-    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <skos:prefLabel rdf:resource="geo:lat=37.7742"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/geolat377742"/>
-   </flickr:tag>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/geonames:feature=5405296">
+    <skos:altLabel>5405296</skos:altLabel>
+    <skos:broader rdf:resource="http://www.machinetags.org/wiki/geonames#feature"/>
+    <skos:prefLabel rdf:resource="geonames:feature=5405296"/>
+  </flickr:tag>
 
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142648">
-    <i:boundingBox>202 224 50 50</i:boundingBox>
-    <a:body>dude! who did this?</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
-
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone">
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone">
     <skos:prefLabel>cameraphone</skos:prefLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/cameraphone"/>
-   </flickr:tag>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/cameraphone"/>
+  </flickr:tag>
 
-   <flickr:user rdf:about="http://www.flickr.com/people/35034348999@N01">
-    <foaf:mbox_sha1sum>a4d1b5e38db5e2ed4f847f9f09fd51cf59bc0d3f</foaf:mbox_sha1sum>
+  <flickr:photoset rdf:about="http://www.flickr.com/photos/35034348999@N01/sets/72157594459261101">
+    <dc:description></dc:description>
+    <dc:title>LOG (2007)</dc:title>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+  </flickr:photoset>
+
+  <flickr:comment rdf:about="http://www.flickr.com/photos/straup/522214395/#comment72157600293655654">
+    <dc:identifier>6065-522214395-72157600293655654</dc:identifier>
+    <dc:created>2007-05-31T14:54:25</dc:created>
+    <a:body>Kittens!</a:body>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:comment>
+
+  <flickr:user rdf:about="http://www.flickr.com/people/35034348999@N01">
+    <foaf:mbox_sha1sum>587a68f90c4030a9b0c7d8ca6ff8549a8b40e5cd</foaf:mbox_sha1sum>
     <foaf:name>Aaron Straup Cope</foaf:name>
     <foaf:nick>straup</foaf:nick>
-   </flickr:user>
+  </flickr:user>
 
-   <rdf:Description rdf:about="x-urn:flickr:comment">
-    <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
-   </rdf:Description>
-
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140942">
-    <i:boundingBox>468 141 22 26</i:boundingBox>
-    <a:body>*sigh*</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
-
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/usa">
-    <skos:prefLabel>usa</skos:prefLabel>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/ph:camera=n95">
+    <skos:altLabel>n95</skos:altLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/usa"/>
-   </flickr:tag>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/ph:camera=n95"/>
+    <skos:prefLabel rdf:resource="ph:camera=n95"/>
+  </flickr:tag>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/cameraphone">
-    <skos:prefLabel>cameraphone</skos:prefLabel>
-   </flickr:tag>
+  <rdf:Description rdf:about="x-urn:flickr:comment">
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
+  </rdf:Description>
 
-   <rdf:Description rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#exif">
-    <exif:flash>32</exif:flash>
-    <exif:digitalZoomRatio>100/100</exif:digitalZoomRatio>
-    <exif:isoSpeedRatings>1250</exif:isoSpeedRatings>
-    <exif:pixelXDimension>1280</exif:pixelXDimension>
-    <exif:apertureValue>336/100</exif:apertureValue>
-    <exif:pixelYDimension>960</exif:pixelYDimension>
-    <exif:focalLength>4.5 mm</exif:focalLength>
-    <exif:dateTimeDigitized>2005-08-02T18:12:19PDT</exif:dateTimeDigitized>
-    <exif:colorSpace>sRGB</exif:colorSpace>
-    <exif:fNumber>f/3.2</exif:fNumber>
-    <exif:dateTimeOriginal>2005-08-02T18:12:19PDT</exif:dateTimeOriginal>
-    <exif:shutterSpeedValue>4321/1000</exif:shutterSpeedValue>
-    <exif:exposureTime>0.05 sec (263/5260)</exif:exposureTime>
-    <exif:gainControl>High gain up</exif:gainControl>
-   </rdf:Description>
+  <flickr:comment rdf:about="http://www.flickr.com/photos/straup/522214395/#comment72157600295486776">
+    <dc:identifier>6065-522214395-72157600295486776</dc:identifier>
+    <dc:created>2007-06-01T00:19:05</dc:created>
+    <a:body>here kitty, kitty, &lt;a href=&quot;http://thincvox.com/audio_recordings/meow.mp3&quot;&gt;meow&lt;/a&gt;</a:body>
+    <dc:creator rdf:resource="http://www.flickr.com/people/72238590@N00"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:comment>
 
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1142656">
-    <i:boundingBox>357 193 81 28</i:boundingBox>
-    <a:body>eww!</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/32373682187@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geonames:feature=5405296">
+    <skos:altLabel>5405296</skos:altLabel>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/geonames:feature=5405296"/>
+    <skos:prefLabel rdf:resource="geonames:feature=5405296"/>
+  </flickr:tag>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/sanfrancisco">
-    <skos:prefLabel>sanfrancisco</skos:prefLabel>
-   </flickr:tag>
+  <flickr:machinetag rdf:about="http://www.machinetags.org/wiki/filtr#process">
+    <mt:predicate>process</mt:predicate>
+    <mt:namespace>filtr</mt:namespace>
+    <dc:isReferencedBy rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:machinetag>
 
-   <flickr:comment rdf:about="http://www.flickr.com/photos/straup/30763528/#comment8399772">
-    <dc:identifier>6065-30763528-8399772</dc:identifier>
-    <dc:created>2005-08-02T18:44:52</dc:created>
-    <a:body>&amp;quot;you have been note-spammed by a passing mad cow...&amp;quot;
-:)</a:body>
-    <dc:creator rdf:resource="http://www.flickr.com/people/32373689382@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:comment>
+  <flickr:machinetag rdf:about="http://www.machinetags.org/wiki/geo#debug">
+    <mt:predicate>debug</mt:predicate>
+    <mt:namespace>geo</mt:namespace>
+    <dc:isReferencedBy rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:machinetag>
 
-   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_m.jpg">
-    <dcterms:relation>Small</dcterms:relation>
-    <exifi:height>180</exifi:height>
-    <exifi:width>240</exifi:width>
-    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#exif"/>
-   </dcterms:StillImage>
+  <flickr:photo rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395">
+    <filtr:process>filtr</filtr:process>
+    <nfr_geo:debug>namespace test</nfr_geo:debug>
+    <acl:access>visbility</acl:access>
+    <dc:title>Untitled #1180563722</dc:title>
+    <ph:camera>n95</ph:camera>
+    <dc:rights>All rights reserved.</dc:rights>
+    <acl:accessor>public</acl:accessor>
+    <dc:description></dc:description>
+    <dc:created>2007-05-30T15:10:01-0700</dc:created>
+    <dc:dateSubmitted>2007-05-30T15:18:39-0700</dc:dateSubmitted>
+    <geonames:feature>5405296</geonames:feature>
+    <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/sanfrancisco"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/ph:camera=n95"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geonames:feature=5405296"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/geo:debug=namespacetest"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/filtr:process=filtr"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/filtr"/>
+    <dc:subject rdf:resource="http://www.flickr.com/photos/35034348999@N01/tags/cameraphone"/>
+    <dcterms:isPartOf rdf:resource="http://www.flickr.com/photos/35034348999@N01/sets/72157594459261101"/>
+    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/straup/522214395/#comment72157600295486776"/>
+    <a:hasAnnotation rdf:resource="http://www.flickr.com/photos/straup/522214395/#comment72157600293655654"/>
+    <geo:Point rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#location"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#000000"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#c0c0c0"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#200000"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#402020"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#808080"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#a08080"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#000020"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#c0a0a0"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#604040"/>
+    <trynt:hasColor rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#806060"/>
+  </flickr:photo>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/geolong122417068">
-    <skos:prefLabel>geolong122417068</skos:prefLabel>
-   </flickr:tag>
-
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1143239">
-    <i:boundingBox>184 164 50 50</i:boundingBox>
-    <a:body>Baaaaarp!</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/34427469121@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
-
-   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_t.jpg">
+  <dcterms:StillImage rdf:about="http://farm1.static.flickr.com/232/522214395_ed16f959a2_t.jpg">
     <dcterms:relation>Thumbnail</dcterms:relation>
     <exifi:height>75</exifi:height>
     <exifi:width>100</exifi:width>
-    <dcterms:isVersionOf rdf:resource="http://static.flickr.com/23/30763528_a981fab285_o.jpg"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#exif"/>
-   </dcterms:StillImage>
+    <dcterms:isVersionOf rdf:resource="http://farm1.static.flickr.com/232/522214395_d2841bdbb0_o.jpg"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#exif"/>
+  </dcterms:StillImage>
 
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1140945">
-    <i:boundingBox>433 103 50 50</i:boundingBox>
-    <a:body>(fuck… fuck…)</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/44124415257@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
+  <rdf:Description rdf:about="x-urn:flickr:machinetag">
+    <rdfs:subClassOf rdf:resource="http://www.w3.org/2004/02/skos/core#Concept"/>
+  </rdf:Description>
 
-   <rdf:Description rdf:about="x-urn:flickr:user">
-    <rdfs:subClassOf rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
-   </rdf:Description>
+  <geo:Point rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#location">
+    <geo:long>-122.401937</geo:long>
+    <acl:access>visbility</acl:access>
+    <geo:lat>37.794694</geo:lat>
+    <flickr:accuracy>16</flickr:accuracy>
+    <acl:accessor>public</acl:accessor>
+    <skos:broader rdf:resource="http://ws.geonames.org/rdf?geonameId=5400754"/>
+    <skos:broader rdf:resource="http://www.flickr.com/geo/United%20States/California/San%20Francisco/San%20Francisco"/>
+  </geo:Point>
 
-   <flickr:grouppool rdf:about="http://www.flickr.com/groups/97155967@N00/pool">
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/groups/97155967@N00"/>
-   </flickr:grouppool>
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/filtr:process=filtr">
+    <skos:altLabel>filtr</skos:altLabel>
+    <skos:broader rdf:resource="http://www.machinetags.org/wiki/filtr#process"/>
+    <skos:prefLabel rdf:resource="filtr:process=filtr"/>
+  </flickr:tag>
 
-   <flickr:user rdf:about="http://www.flickr.com/people/32373689382@N01">
-    <foaf:mbox_sha1sum>e0d207bb5643d4d7dd60e72d4ce2a94bae0e13b6</foaf:mbox_sha1sum>
-    <foaf:name>Boris Anthony</foaf:name>
-    <foaf:nick>bopuc</foaf:nick>
-   </flickr:user>
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#808080">
+    <trynt:hexidecimal>808080</trynt:hexidecimal>
+    <trynt:count>726</trynt:count>
+  </trynt:color>
 
-   <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geolong122417068">
-    <skos:altLabel>geolong122417068</skos:altLabel>
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#a08080">
+    <trynt:hexidecimal>a08080</trynt:hexidecimal>
+    <trynt:count>575</trynt:count>
+  </trynt:color>
+
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#000020">
+    <trynt:hexidecimal>000020</trynt:hexidecimal>
+    <trynt:count>499</trynt:count>
+  </trynt:color>
+
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#402020">
+    <trynt:hexidecimal>402020</trynt:hexidecimal>
+    <trynt:count>749</trynt:count>
+  </trynt:color>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/ph:camera=n95">
+    <skos:altLabel>n95</skos:altLabel>
+    <skos:broader rdf:resource="http://www.machinetags.org/wiki/ph#camera"/>
+    <skos:prefLabel rdf:resource="ph:camera=n95"/>
+  </flickr:tag>
+
+  <rdf:Description rdf:about="#">
+    <dcterms:hasVersion>2.0:1180823550</dcterms:hasVersion>
+    <dc:created>2007-06-02T15:32:30-0700</dc:created>
+    <dc:creator rdf:resource="http://search.cpan.org/dist/Net-Flickr-RDF-2.0"/>
+    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </rdf:Description>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/filtr">
+    <skos:prefLabel>filtr</skos:prefLabel>
+  </flickr:tag>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/35034348999@N01/tags/geo:debug=namespacetest">
+    <skos:altLabel>namespace test</skos:altLabel>
     <dc:creator rdf:resource="http://www.flickr.com/people/35034348999@N01"/>
-    <skos:prefLabel rdf:resource="geo:long=-122.417068"/>
-    <dcterms:isPartOf rdf:resource="http://www.flickr.com/tags/geolong122417068"/>
-   </flickr:tag>
+    <skos:broader rdf:resource="http://www.flickr.com/photos/tags/geo:debug=namespacetest"/>
+    <skos:prefLabel rdf:resource="geo:debug=namespace test"/>
+    <skos:altLabel rdf:resource="geo:debug=namespacetest"/>
+  </flickr:tag>
 
-   <flickr:group rdf:about="http://www.flickr.com/groups/97155967@N00">
-    <dc:description></dc:description>
-    <dc:title>aaronland</dc:title>
-   </flickr:group>
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#200000">
+    <trynt:hexidecimal>200000</trynt:hexidecimal>
+    <trynt:count>841</trynt:count>
+  </trynt:color>
 
-   <flickr:tag rdf:about="http://www.flickr.com/tags/geolat377742">
-    <skos:prefLabel>geolat377742</skos:prefLabel>
-   </flickr:tag>
+  <dcterms:StillImage rdf:about="http://farm1.static.flickr.com/232/522214395_ed16f959a2_m.jpg">
+    <dcterms:relation>Small</dcterms:relation>
+    <exifi:height>180</exifi:height>
+    <exifi:width>240</exifi:width>
+    <dcterms:isVersionOf rdf:resource="http://farm1.static.flickr.com/232/522214395_d2841bdbb0_o.jpg"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#exif"/>
+  </dcterms:StillImage>
 
-   <cc:License rdf:about="http://creativecommons.org/licenses/by-nd/2.0/">
-    <cc:requires rdf:resource="http://web.resource.org/cc/Notice"/>
-    <cc:requires rdf:resource="http://web.resource.org/cc/Attribution"/>
-    <cc:requires rdf:resource="http://web.resource.org/cc/ShareAlike"/>
-    <cc:permits rdf:resource="http://web.resource.org/cc/Reproduction"/>
-    <cc:permits rdf:resource="http://web.resource.org/cc/Distribution"/>
-   </cc:License>
+  <rdf:Description rdf:about="x-urn:flickr:user">
+    <rdfs:subClassOf rdf:resource="http://xmlns.com/foaf/0.1/Person"/>
+  </rdf:Description>
 
-   <dcterms:StillImage rdf:about="http://static.flickr.com/23/30763528_a981fab285_o.jpg">
-    <dcterms:relation>Original</dcterms:relation>
-    <exifi:height>960</exifi:height>
-    <exifi:width>1280</exifi:width>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528#exif"/>
-   </dcterms:StillImage>
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#806060">
+    <trynt:hexidecimal>806060</trynt:hexidecimal>
+    <trynt:count>464</trynt:count>
+  </trynt:color>
 
-   <rdf:Description rdf:about="x-urn:flickr:note">
-    <rdfs:subClassOf rdf:resource="http://www.w3.org/2000/10/annotation-nsAnnotation"/>
-   </rdf:Description>
+  <flickr:machinetag rdf:about="http://www.machinetags.org/wiki/ph#camera">
+    <mt:predicate>camera</mt:predicate>
+    <mt:namespace>ph</mt:namespace>
+    <dc:isReferencedBy rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:machinetag>
 
-   <flickr:note rdf:about="http://www.flickr.com/photos/35034348999@N01/30763528#note-1148950">
-    <i:boundingBox>342 197 28 33</i:boundingBox>
-    <a:body>Is that just one big boob, or...?</a:body>
-    <i:regionDepicts rdf:resource="http://static.flickr.com/23/30763528_a981fab285.jpg"/>
-    <a:author rdf:resource="http://www.flickr.com/people/34427469121@N01"/>
-    <a:annotates rdf:resource="http://www.flickr.com/photos/35034348999@N01/30763528"/>
-   </flickr:note>
+  <dcterms:StillImage rdf:about="http://farm1.static.flickr.com/232/522214395_ed16f959a2_s.jpg">
+    <dcterms:relation>Square</dcterms:relation>
+    <exifi:height>75</exifi:height>
+    <exifi:width>75</exifi:width>
+    <dcterms:isVersionOf rdf:resource="http://farm1.static.flickr.com/232/522214395_d2841bdbb0_o.jpg"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#exif"/>
+  </dcterms:StillImage>
+
+  <dcterms:StillImage rdf:about="http://farm1.static.flickr.com/232/522214395_ed16f959a2_b.jpg">
+    <dcterms:relation>Large</dcterms:relation>
+    <exifi:height>768</exifi:height>
+    <exifi:width>1024</exifi:width>
+    <dcterms:isVersionOf rdf:resource="http://farm1.static.flickr.com/232/522214395_d2841bdbb0_o.jpg"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+    <rdfs:seeAlso rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395#exif"/>
+  </dcterms:StillImage>
+
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#c0a0a0">
+    <trynt:hexidecimal>c0a0a0</trynt:hexidecimal>
+    <trynt:count>488</trynt:count>
+  </trynt:color>
+
+  <flickr:place rdf:about="http://www.flickr.com/geo/United%20States/California/San%20Francisco/San%20Francisco">
+    <place:county>San Francisco</place:county>
+    <place:country>United States</place:country>
+    <place:region>California</place:region>
+    <place:locality>San Francisco</place:locality>
+    <dc:isReferencedBy rdf:resource="http://www.flickr.com/photos/35034348999@N01/522214395"/>
+  </flickr:place>
+
+  <trynt:color rdf:about="http://www.flickr.com/photos/35034348999@N01/522214395#c0c0c0">
+    <trynt:hexidecimal>c0c0c0</trynt:hexidecimal>
+    <trynt:count>1475</trynt:count>
+  </trynt:color>
+
+  <flickr:tag rdf:about="http://www.flickr.com/photos/tags/geo:debug=namespacetest">
+    <skos:altLabel>namespace test</skos:altLabel>
+    <skos:broader rdf:resource="http://www.machinetags.org/wiki/geo#debug"/>
+    <skos:prefLabel rdf:resource="geo:debug=namespacetest"/>
+  </flickr:tag>
+
   </rdf:RDF>
 
 =head1 VERSION
 
-2.96
+2.97
 
 =head1 DATE
 
-$Date: 2006/11/19 22:02:17 $
+$Date: 2007/06/06 05:16:09 $
 
 =head1 AUTHOR
 
@@ -1927,7 +1992,7 @@ Please report all bugs via http://rt.cpan.org
 
 =head1 LICENSE
 
-Copyright (c) 2005-2006 Aaron Straup Cope. All Rights Reserved.
+Copyright (c) 2005-2007 Aaron Straup Cope. All Rights Reserved.
 
 This is free software. You may redistribute it and/or
 modify it under the same terms as Perl itself.
