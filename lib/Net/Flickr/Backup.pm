@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.101 2007/06/06 05:16:09 asc Exp $
+# $Id: Backup.pm,v 1.103 2007/09/03 05:36:44 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.97';
+$Net::Flickr::Backup::VERSION = '2.98';
 
 =head1 NAME
 
@@ -428,7 +428,7 @@ sub backup {
         my $self = shift;
         my $args = shift;
         
-        my $auth = $self->_auth();
+        my $auth = $self->get_auth();
         
         if (! $auth) {
                 return 0;
@@ -580,7 +580,7 @@ sub backup_photo {
         my $id     = shift;
         my $secret = shift;
         
-        if (! $self->_auth()) {
+        if (! $self->get_auth()) {
                 return 0;
         }
         
@@ -870,21 +870,27 @@ sub store_rdf {
         
         if (! $desc_ok) {
                 $self->log()->error("failed to describe photo $id:$secret\n");
-                $fh->delete();
+
+                if (! $rdf_inline){
+                        $fh->delete();
+                }
+
                 return 0;
         }
         
-        if ((! $rdf_inline) && (! $fh->close())) {
-                $self->log()->error("failed to write '$meta_bak', $!");
-                return 0;
-        }
-
         #
         # JPEG/RDF COM
         #
 
         if ($rdf_inline) {
                 if (! $self->store_rdf_inline(\$rdf_str, $self->{'__files'}->{'Original'})) {
+                        return 0;
+                }
+        }
+
+        else {
+                if (! $fh->close()) {
+                        $self->log()->error("failed to write '$meta_bak', $!");
                         return 0;
                 }
         }
@@ -1003,7 +1009,8 @@ sub scrub {
                             if (grep/$shortname/,@{$self->{'_scrub'}->{$id}}) {
                                     return 0;
                             }
-                            
+         
+                            $self->log()->info("mark $path for scrubbing");
                             return 1;
                     });
         
@@ -1011,6 +1018,8 @@ sub scrub {
         
         foreach my $root ($rule->in($self->{'cfg'}->param("backup.photos_root"))) {
                 
+                $self->log()->info("unlink $root");
+
                 if (! unlink($root)) {
                         $self->log()->error("failed to unlink $root, $!");
                         next;
@@ -1028,6 +1037,9 @@ sub scrub {
                         }
                         
                         else {
+
+                                $self->log()->info("unlink $path");
+
                                 if (! rmtree([$path], 0, 1)) {
                                         $self->log()->error("failed to unlink, $path");
                                         last;
@@ -1364,29 +1376,6 @@ sub path_rdf_dumpfile {
         my $meta_path  = File::Spec->catfile($meta_root, $meta_fname);
 
         return $meta_path;
-}
-
-sub _auth {
-        my $self = shift;
-        
-        if (! $self->{'__auth'}) {
-                my $auth = $self->api_call({"method" => "flickr.auth.checkToken"});
-                
-                if (! $auth) {
-                        return undef;
-                }
-                
-                my $nsid = $auth->find("/rsp/auth/user/\@nsid")->string_value();
-                
-                if (! $nsid) {
-                        $self->log()->error("unabled to determine ID for token");
-                        return undef;
-                }
-                
-                $self->{'__auth'} = $auth;
-        }
-        
-        return $self->{'__auth'};
 }
 
 sub _clean {
@@ -1966,11 +1955,11 @@ Flickr (using Net::Flickr::RDF) :
 
 =head1 VERSION
 
-2.97
+2.98
 
 =head1 DATE
 
-$Date: 2007/06/06 05:16:09 $
+$Date: 2007/09/03 05:36:44 $
 
 =head1 AUTHOR
 

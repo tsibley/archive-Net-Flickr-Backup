@@ -6,9 +6,24 @@
 @prefix asc:     <http://aaronland.info/ns/changefile/> .
                                      
 <>
-        dc:identifier           "$Id: Changes,v 1.45 2007/06/06 05:13:01 asc Exp $" ;
+        dc:identifier           "$Id: Changes,v 1.47 2007/09/03 05:36:44 asc Exp $" ;
         dc:description          "Changes for Net::Flickr::Backup" ;
         dcterms:references      <http://aaronland.info/perl/net/flickr/backup/> .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.98.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.97.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.98" ;
+                        doap:created      "2007-09-03" ;
+                        ];
+        asc:changes     [
+                        asc:bugfix        "When writing RDF dumps do not call IO::AtomicFile->delete if we are doing inline RDF" ;
+                        asc:update        "Log 'info' events when scrubbing files" ;
+                        asc:update        "Update to use N:F:RDF 2.01 (bug fixes in N:F:API)" ;
+                        asc:update        "Replace calls to _auth with N:F:API->get_auth" ;
+                        ] .
 
 <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.97.tar.gz>        
         dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
