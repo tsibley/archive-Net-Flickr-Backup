@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.103 2007/09/03 05:36:44 asc Exp $
+# $Id: Backup.pm,v 1.105 2007/10/01 15:52:02 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.98';
+$Net::Flickr::Backup::VERSION = '2.99';
 
 =head1 NAME
 
@@ -580,6 +580,10 @@ sub backup_photo {
         my $id     = shift;
         my $secret = shift;
         
+        # FIX ME : add 'skip' hash containing id+secret
+        # If there is a problem storing photo data, ensure
+        # that it is not accidentally scrubbed.
+
         if (! $self->get_auth()) {
                 return 0;
         }
@@ -595,10 +599,10 @@ sub backup_photo {
         }
                 
         #
-        
-        my $info = $self->api_call({method=>"flickr.photos.getInfo",
-                                    args=>{photo_id => $id,
-                                           secret   => $secret}});
+
+        my $info = $self->api_call({method =>"flickr.photos.getInfo",
+                                    args => {'photo_id' => $id,
+                                             'secret' => $secret}});
         
         if (! $info) {
                 return 0;
@@ -630,7 +634,7 @@ sub backup_photo {
         
         my $title = &_clean($data{title}) || "untitled";
 
-        my $dt    = $data{taken};
+        my $dt = $data{taken};
         
         $dt =~ /^(\d{4})-(\d{2})-(\d{2})/;
         my ($yyyy,$mm,$dd) = ($1,$2,$3);	  	    
@@ -678,6 +682,7 @@ sub backup_photo {
                 my $img_root  = File::Spec->catdir($photos_root, $yyyy, $mm, $dd);
                 my $img_fname = sprintf("%04d%02d%02d-%d-%s%s.jpg", $yyyy, $mm, $dd, $id, $title, $FETCH_SIZES{$label});
                 
+                $self->log()->info("scrub-store $img_fname");
                 push @{$self->{'_scrub'}->{$id}}, $img_fname;
                 
                 my $img_bak = File::Spec->catfile($img_root, $img_fname);
@@ -723,6 +728,13 @@ sub backup_photo {
                 
                 $files_modified ++;
         }
+
+        #
+        # Ensure that we don't accidentally purge any metafiles
+        #
+
+        my $meta_bak = $self->path_rdf_dumpfile($info);
+        push @{$self->{'_scrub'}->{$id}}, basename($meta_bak);
 
         #
         # Do we need to keep going...
@@ -819,9 +831,7 @@ sub store_rdf {
 
         if ((! $force) && (! $has_changed) && (! $rdf_inline) && (-f $meta_bak)) {
                 return 1;
-        }
-        
-        push @{$self->{'_scrub'}->{$id}}, $meta_bak;
+        }       
         
         #
         #
@@ -993,8 +1003,8 @@ sub scrub {
         $rule->exec(sub {
                             my ($shortname, $path, $fullname) = @_;
                             
-                            # print "test $shortname\n";
-                            
+                            # $self->log()->info("test $shortname");
+                                    
                             $shortname =~ /^\d{8}-(\d+)-/;
                             my $id = $1;
                          
@@ -1006,11 +1016,11 @@ sub scrub {
                                     return 0;
                             }
                             
-                            if (grep/$shortname/,@{$self->{'_scrub'}->{$id}}) {
+                            if (grep /$shortname/, @{$self->{'_scrub'}->{$id}}) {
                                     return 0;
                             }
          
-                            $self->log()->info("mark $path for scrubbing");
+                            $self->log()->info("mark $fullname for scrubbing");
                             return 1;
                     });
         
@@ -1396,8 +1406,9 @@ sub _clean {
         $str =~ s/&/and/g;
         $str =~ s/\*/star/g;
         
-        $str =~ s/[^a-z0-9\[\]-_]/ /ig;
+        $str =~ s/[^a-z0-9-_]/ /ig;
         $str =~ s/'//g;
+        $str =~ s/\^//g;
         
         # make all whitespace single spaces
         $str =~ s/\s+/ /g;
@@ -1955,11 +1966,11 @@ Flickr (using Net::Flickr::RDF) :
 
 =head1 VERSION
 
-2.98
+2.99
 
 =head1 DATE
 
-$Date: 2007/09/03 05:36:44 $
+$Date: 2007/10/01 15:52:02 $
 
 =head1 AUTHOR
 

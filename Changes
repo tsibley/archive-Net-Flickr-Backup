@@ -6,9 +6,21 @@
 @prefix asc:     <http://aaronland.info/ns/changefile/> .
                                      
 <>
-        dc:identifier           "$Id: Changes,v 1.47 2007/09/03 05:36:44 asc Exp $" ;
+        dc:identifier           "$Id: Changes,v 1.48 2007/10/01 15:52:02 asc Exp $" ;
         dc:description          "Changes for Net::Flickr::Backup" ;
         dcterms:references      <http://aaronland.info/perl/net/flickr/backup/> .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.99.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.98.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.99" ;
+                        doap:created      "2007-10-01" ;
+                        ];
+        asc:changes     [
+                        asc:bugfix        "Ensure that RDF dumps for the current valid photo are excluded when scrubbing photos" ;
+                        ] .
 
 <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.98.tar.gz>        
         dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;

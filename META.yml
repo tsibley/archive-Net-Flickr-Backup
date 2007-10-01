@@ -1,6 +1,6 @@
 ---
 name: Net-Flickr-Backup
-version: 2.98
+version: 2.99
 author:
   - 'Aaron Straup Cope E<lt>ascope@cpan.orgE<gt>'
 abstract: OOP for backing up your Flickr photos locally
@@ -26,7 +26,7 @@ build_requires:
 provides:
   Net::Flickr::Backup:
     file: lib/Net/Flickr/Backup.pm
-    version: 2.98
+    version: 2.99
 generated_by: Module::Build version 0.2808
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.2.html

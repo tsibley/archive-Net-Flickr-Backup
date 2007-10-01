@@ -815,10 +815,10 @@ EXAMPLES
       </rdf:RDF>
 
 VERSION
-    2.98
+    2.99
 
 DATE
-    $Date: 2007/09/03 05:36:44 $
+    $Date: 2007/10/01 15:52:02 $
 
 AUTHOR
     Aaron Straup Cope <ascope@cpan.org>
