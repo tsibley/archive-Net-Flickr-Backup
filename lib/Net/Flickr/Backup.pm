@@ -1,4 +1,4 @@
-# $Id: Backup.pm,v 1.105 2007/10/01 15:52:02 asc Exp $
+# $Id: Backup.pm,v 1.106 2008/02/08 08:20:10 asc Exp $
 # -*-perl-*-
 
 use strict;
@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.99';
+$Net::Flickr::Backup::VERSION = '2.991';
 
 =head1 NAME
 
@@ -1966,11 +1966,11 @@ Flickr (using Net::Flickr::RDF) :
 
 =head1 VERSION
 
-2.99
+2.991
 
 =head1 DATE
 
-$Date: 2007/10/01 15:52:02 $
+$Date: 2008/02/08 08:20:10 $
 
 =head1 AUTHOR
 
@@ -1992,7 +1992,7 @@ Please report all bugs via http://rt.cpan.org
 
 =head1 LICENSE
 
-Copyright (c) 2005-2007 Aaron Straup Cope. All Rights Reserved.
+Copyright (c) 2005-2008 Aaron Straup Cope. All Rights Reserved.
 
 This is free software. You may redistribute it and/or
 modify it under the same terms as Perl itself.

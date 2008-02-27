@@ -6,9 +6,21 @@
 @prefix asc:     <http://aaronland.info/ns/changefile/> .
                                      
 <>
-        dc:identifier           "$Id: Changes,v 1.48 2007/10/01 15:52:02 asc Exp $" ;
+        dc:identifier           "$Id: Changes,v 1.50 2008/02/27 06:04:45 asc Exp $" ;
         dc:description          "Changes for Net::Flickr::Backup" ;
         dcterms:references      <http://aaronland.info/perl/net/flickr/backup/> .
+
+<http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.991.tar.gz>        
+        dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;
+        dcterms:replaces    <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.99.tar.gz> ;
+
+        doap:Version    [
+                        doap:revision     "2.991" ;
+                        doap:created      "2008-02-26" ;
+                        ];
+        asc:changes     [
+                        asc:update        "Require Net::Flickr::RDF 2.1 (record Flickr Places/geo info)" ;
+                        ] .
 
 <http://aaronland.info/perl/net/flickr/backup/Net-Flickr-Backup-2.99.tar.gz>        
         dcterms:isVersionOf <http://aaronland.info/perl/net/flickr/backup/> ;

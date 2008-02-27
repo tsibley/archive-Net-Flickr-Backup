@@ -815,10 +815,10 @@ EXAMPLES
       </rdf:RDF>
 
 VERSION
-    2.99
+    2.991
 
 DATE
-    $Date: 2007/10/01 15:52:02 $
+    $Date: 2008/02/08 08:20:10 $
 
 AUTHOR
     Aaron Straup Cope <ascope@cpan.org>
@@ -836,7 +836,7 @@ BUGS
     Please report all bugs via http://rt.cpan.org
 
 LICENSE
-    Copyright (c) 2005-2007 Aaron Straup Cope. All Rights Reserved.
+    Copyright (c) 2005-2008 Aaron Straup Cope. All Rights Reserved.
 
     This is free software. You may redistribute it and/or modify it under
     the same terms as Perl itself.
