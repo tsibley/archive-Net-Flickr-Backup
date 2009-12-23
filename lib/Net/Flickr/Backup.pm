@@ -541,7 +541,7 @@ sub backup {
 
                 }
                 
-                if ($current_page == $num_pages) {
+                if ($current_page >= $num_pages) {
                         $poll = 0;
                 }
                 
