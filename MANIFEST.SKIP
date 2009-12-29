@@ -13,3 +13,7 @@ Makefile.old$
 t/TEST$
 t/SMOKE$
 ^blibdirs\.ts
+\B\.git\b
+MANIFEST\.bak
+^_build/
+^\.gitignore

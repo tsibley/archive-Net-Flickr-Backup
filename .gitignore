@@ -1,0 +1,4 @@
+Build
+MANIFEST.bak
+_build/
+*.tar.gz
