@@ -7,7 +7,7 @@ use warnings;
 package Net::Flickr::Backup;
 use base qw (Net::Flickr::RDF);
 
-$Net::Flickr::Backup::VERSION = '2.991';
+$Net::Flickr::Backup::VERSION = '2.991b';
 
 =head1 NAME
 
