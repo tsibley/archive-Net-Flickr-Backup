@@ -114,19 +114,34 @@ versions. Filenames will be modified as follows :
 
 =over 4 
 
-=item * B<original>
+=item * B<Original>
 
-The original photo you uploaded to the Flickr servers. No extension is
+The original photo you uploaded to the Flickr servers. A B<.jpg> extension is
 added.
 
-=item * B<medium>
+=item * B<Medium>
 
-These photos are scaled to 500 pixels at the longest dimension. A B<_m>
+These photos are scaled to 500 pixels at the longest dimension. A B<_m.jpg>
 extension is added.
 
-=item * B<square>
+=item * B<Square>
 
-These photos are to cropped to 75 x 75 pixels at the center. A B<_s>
+These photos are to cropped to 75 x 75 pixels at the center. A B<_s.jpg>
+extension is added.
+
+=item * B<Site MP4>
+
+These videos are scaled to for a normal browser. A B<_s.mp4>
+extension is added.
+
+=item * B<Mobile MP4>
+
+These videos are scaled to for a mobile client. A B<_m.mp4>
+extension is added.
+
+=item * B<Video Original>
+
+The original video you uploaded to the Flickr servers. A B<.video>
 extension is added.
 
 =back
@@ -156,6 +171,31 @@ Boolean.
 
 Retrieve the "square" version of a photo from the Flickr servers; these photos
 have been cropped to 75 x 75 pixels at the center.
+
+Default is false.
+
+=item * B<fetch_video_original>
+
+Boolean.
+
+Retrieve the "original" version of a video from the Flickr servers. 
+
+Default is true.
+
+=item * B<fetch_site_mp4>
+
+Boolean.
+
+Retrieve the "site" version of a video from the Flickr servers.
+
+Default is false.
+
+=item * B<fetch_mobile_mp4>
+
+Boolean.
+
+Retrieve the "mobile" version of a video from the Flickr servers; these videos
+have been scaled down significantly.
 
 Default is false.
 
@@ -358,9 +398,12 @@ use LWP::Simple;
 use Memoize;
 use Sys::Hostname;
 
-Readonly::Hash my %FETCH_SIZES => ('Original' => '',
-				   'Medium'   => '_m',
-				   'Square'   => '_s');
+Readonly::Hash my %FETCH_SIZES => ('Original'       => '.jpg',
+                                   'Medium'         => '_m.jpg',
+                                   'Square'         => '_s.jpg',
+                                   'Site MP4'       => '_s.mp4',
+                                   'Mobile MP4'     => '_m.mp4',
+                                   'Video Original' => '.video');
 
 Readonly::Scalar my $FLICKR_URL        => "http://www.flickr.com/";
 Readonly::Scalar my $FLICKR_URL_PHOTOS => $FLICKR_URL . "photos/";				      
@@ -659,7 +702,9 @@ sub backup_photo {
                 my $fetch_param = "fetch_".lc($label);
                 my $do_fetch    = 1;
                 
-                if (($label ne "Original") || (exists($fetch_cfg->{$fetch_param}))) {
+                $fetch_param =~ s/ /_/g;
+
+                if (($label !~ /Original/) || (exists($fetch_cfg->{$fetch_param}))) {
                         $do_fetch = $fetch_cfg->{$fetch_param};
                 }
                 
@@ -680,7 +725,7 @@ sub backup_photo {
                 my $source  = $sz->getAttribute("source");
                 
                 my $img_root  = File::Spec->catdir($photos_root, $yyyy, $mm, $dd);
-                my $img_fname = sprintf("%04d%02d%02d-%s-%s%s.jpg", $yyyy, $mm, $dd, $id, $title, $FETCH_SIZES{$label});
+                my $img_fname = sprintf("%04d%02d%02d-%s-%s%s", $yyyy, $mm, $dd, $id, $title, $FETCH_SIZES{$label});
                 
                 $self->log()->info("scrub-store $img_fname");
                 push @{$self->{'_scrub'}->{$id}}, $img_fname;
