@@ -11,7 +11,7 @@ SYNOPSIS
                                                   'min_level' => 'info');
 
         $flickr->log()->add($feedback);
-        $flickr->backup(); 
+        $flickr->backup();
 
 DESCRIPTION
     OOP for backing up your Flickr photos locally.
@@ -21,17 +21,20 @@ OPTIONS
     or a valid Config::Simple config file. Options are grouped by "block".
 
   flickr
-    * api_key
+    *   api_key
+
         String. *required*
 
         A valid Flickr API key.
 
-    * api_secret
+    *   api_secret
+
         String. *required*
 
         A valid Flickr Auth API secret key.
 
-    * auth_token
+    *   auth_token
+
         String. *required*
 
         A valid Flickr Auth API token.
@@ -39,14 +42,17 @@ OPTIONS
         The api_handler defines which XML/XPath handler to use to process
         API responses.
 
-        * LibXML
+        *   LibXML
+
             Use XML::LibXML.
 
-        * XPath
+        *   XPath
+
             Use XML::XPath.
 
   backup
-    * photos_root
+    *   photos_root
+
         String. *required*
 
         The root folder where you want photographs to be stored. Individual
@@ -56,45 +62,69 @@ OPTIONS
 
         Where the various components are :
 
-        * YYYYMMDD
+        *   YYYYMMDD
+
              photo[@id=123]/dates/@taken
 
-        * photo_id
+        *   photo_id
+
             photo/@id
 
-        * clean_title
+        *   clean_title
+
              photo[@id=123]/title
 
             Unicode characters translated in to ASCII (using
             Text::Unidecode) and the entire string is stripped anything that
             is not an alphanumeric, underbar, dash or a square bracket.
 
-        * size
+        *   size
+
             Net::Flickr::Backup will attempt to fetch not only the original
             file uploaded to Flickr but also, depending on your config
             options, the medium and square versions. Filenames will be
             modified as follows :
 
-            * original
-                The original photo you uploaded to the Flickr servers. No
+            *   Original
+
+                The original photo you uploaded to the Flickr servers. A
+                .jpg extension is added.
+
+            *   Medium
+
+                These photos are scaled to 500 pixels at the longest
+                dimension. A _m.jpg extension is added.
+
+            *   Square
+
+                These photos are to cropped to 75 x 75 pixels at the center.
+                A _s.jpg extension is added.
+
+            *   Site MP4
+
+                These videos are scaled to for a normal browser. A _s.mp4
                 extension is added.
 
-            * medium
-                These photos are scaled to 500 pixels at the longest
-                dimension. A _m extension is added.
+            *   Mobile MP4
 
-            * square
-                These photos are to cropped to 75 x 75 pixels at the center.
-                A _s extension is added.
+                These videos are scaled to for a mobile client. A _m.mp4
+                extension is added.
 
-    * fetch_original
+            *   Video Original
+
+                The original video you uploaded to the Flickr servers. A
+                .video extension is added.
+
+    *   fetch_original
+
         Boolean.
 
         Retrieve the "original" version of a photo from the Flickr servers.
 
         Default is true.
 
-    * fetch_medium
+    *   fetch_medium
+
         Boolean.
 
         Retrieve the "medium" version of a photo from the Flickr servers;
@@ -103,7 +133,8 @@ OPTIONS
 
         Default is false.
 
-    * fetch_square
+    *   fetch_square
+
         Boolean.
 
         Retrieve the "square" version of a photo from the Flickr servers;
@@ -111,14 +142,41 @@ OPTIONS
 
         Default is false.
 
-    * scrub_backups
+    *   fetch_video_original
+
+        Boolean.
+
+        Retrieve the "original" version of a video from the Flickr servers.
+
+        Default is true.
+
+    *   fetch_site_mp4
+
+        Boolean.
+
+        Retrieve the "site" version of a video from the Flickr servers.
+
+        Default is false.
+
+    *   fetch_mobile_mp4
+
+        Boolean.
+
+        Retrieve the "mobile" version of a video from the Flickr servers;
+        these videos have been scaled down significantly.
+
+        Default is false.
+
+    *   scrub_backups
+
         Boolean.
 
         If true then, for each Flickr photo ID backed up, the library will
         check backup.photos_root for images (and metadata files) with a
         matching ID but a different name. Matches will be deleted.
 
-    * force
+    *   force
+
         Boolean.
 
         Force a photograph to be backed up even if it has not changed.
@@ -126,7 +184,8 @@ OPTIONS
         Default is false.
 
   rdf
-    * do_dump
+    *   do_dump
+
         Boolean.
 
         Generate an RDF description for each photograph. Descriptions are
@@ -134,7 +193,8 @@ OPTIONS
 
         Default is false.
 
-    * rdfdump_root
+    *   rdfdump_root
+
         String.
 
         The path where RDF data dumps for a photo should be written. The
@@ -143,7 +203,8 @@ OPTIONS
         File names are generated with the same pattern used to name
         photographs.
 
-    * rdfdump_inline
+    *   rdfdump_inline
+
         Boolean.
 
         Set to true if you want the RDF dump for a photo to be stored in the
@@ -158,7 +219,8 @@ OPTIONS
 
         Default is false.
 
-    * photos_alias
+    *   photos_alias
+
         String.
 
         If defined this string is applied as regular expression substitution
@@ -166,7 +228,8 @@ OPTIONS
 
         Default is to append the file:/ URI protocol to a path.
 
-    * query_geonames
+    *   query_geonames
+
         Boolean.
 
         If true and a photo has geodata (latitude, longitude) associated
@@ -192,7 +255,8 @@ OPTIONS
             <geoname:gtopo30>2</geoname:gtopo30>
          </geoname:Feature>
 
-    * <query_trynt_color_api>
+    *   <query_trynt_color_api>
+
         Boolean.
 
         If true, the trynt colour extraction web service will be queried
@@ -212,7 +276,8 @@ OPTIONS
         Default is false.
 
   iptc
-    * do_dump
+    *   do_dump
+
         Boolean.
 
         If true, then a limited set of metadata associated with a photo will
@@ -232,7 +297,7 @@ OPTIONS
          Iptc.Application2.Keywords                   String      5  filtr
          Iptc.Application2.Keywords                   String      3  mie
          Iptc.Application2.Keywords                   String     20  upcoming:event=77752
-         Iptc.Application2.Headline                   String      3  Mie  
+         Iptc.Application2.Headline                   String      3  Mie
 
         Default is false.
 
@@ -249,13 +314,21 @@ OPTIONS
     The syntax is (n)(modifier) where (n) is a positive integer and
     (modifier) may be one of the following :
 
-    * h Fetch photos that have been modified in the last (n) hours.
+    *   h
 
-    * d Fetch photos that have been modified in the last (n) days.
+        Fetch photos that have been modified in the last (n) hours.
 
-    * w Fetch photos that have been modified in the last (n) weeks.
+    *   d
 
-    * M Fetch photos that have been modified in the last (n) months.
+        Fetch photos that have been modified in the last (n) days.
+
+    *   w
+
+        Fetch photos that have been modified in the last (n) weeks.
+
+    *   M
+
+        Fetch photos that have been modified in the last (n) months.
 
 PACKAGE METHODS
   __PACKAGE__->new($cfg)
@@ -282,7 +355,8 @@ OBJECT METHODS YOU MAY CARE ABOUT
 
     Valid callback triggers are :
 
-    * start_backup_queue
+    *   start_backup_queue
+
         The list of photos to be backed up is pulled from the Flickr servers
         is done in batches. This trigger is invoked for the first successful
         result set.
@@ -290,17 +364,20 @@ OBJECT METHODS YOU MAY CARE ABOUT
         The callback function will be passed a *XML::XPath* representation
         of the result document returned by the Flickr API.
 
-    * finish_backup_queue
+    *   finish_backup_queue
+
         This trigger is invoked after the last photo has been backed up.
 
-    * start_backup_photo
+    *   start_backup_photo
+
         This trigger is invoked before the object's backup_photo method is
         called.
 
         The callback function will be passed a *XML::XPath* representation
         of the current photo, as returned by the Flickr API.
 
-    * finish_backup_photo
+    *   finish_backup_photo
+
         This trigger is invoked after the object's backup_photo method is
         called.
 
@@ -392,11 +469,13 @@ OBJECT METHODS YOU MAY CARE ABOUT
   $obj->api_call(\%args)
     Valid args are :
 
-    * method
+    *   method
+
         A string containing the name of the Flickr API method you are
         calling.
 
-    * args
+    *   args
+
         A hash ref containing the key value pairs you are passing to
         *method*
 

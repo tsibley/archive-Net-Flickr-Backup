@@ -9,7 +9,7 @@ my $build = Module::Build->new(module_name => 'Net::Flickr::Backup',
 			       dist_version_from => 'lib/Net/Flickr/Backup.pm',
 			       license           => 'perl',
 			       requires => {
-                                            'perl'            => '>= 5.8.0',
+                                            'perl'            => '5.8.0',
                                             'Net::Flickr::RDF' => '>= 2.12',
                                             'Encode'          => '>= 2.09',
                                             'File::Find::Rule' => '0',
@@ -27,6 +27,6 @@ my $build = Module::Build->new(module_name => 'Net::Flickr::Backup',
 				   'Test::Simple' => '>= 0.47',
 			       },
 			       create_readme      => 1,
-			       create_makefile_pl => 'passthrough');
+			       create_makefile_pl => 'small');
 
 $build->create_build_script();

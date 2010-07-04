@@ -6,7 +6,7 @@ build_requires:
   Test::Simple: '>= 0.47'
 configure_requires:
   Module::Build: 0.36
-generated_by: 'Module::Build version 0.3601'
+generated_by: 'Module::Build version 0.3607'
 license: perl
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -15,7 +15,7 @@ name: Net-Flickr-Backup
 provides:
   Net::Flickr::Backup:
     file: lib/Net/Flickr/Backup.pm
-    version: 2.9912
+    version: 2.9913
 requires:
   Date::Format: '>= 2.22'
   Date::Parse: '>= 2.27'
@@ -26,10 +26,10 @@ requires:
   Image::MetaData::JPEG: '>= 0.15'
   LWP::Simple: '>= 1.38'
   Memoize: 0
-  Net::Flickr::RDF: '>= 2.1b'
+  Net::Flickr::RDF: '>= 2.12'
   Sys::Hostname: 0
   Text::Unidecode: '>= 0.04'
-  perl: '>= 5.8.0'
+  perl: v5.8.0
 resources:
   license: http://dev.perl.org/licenses/
-version: 2.9912
+version: 2.9913
