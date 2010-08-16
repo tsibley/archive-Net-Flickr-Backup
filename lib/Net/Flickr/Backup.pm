@@ -124,6 +124,11 @@ added.
 These photos are scaled to 500 pixels at the longest dimension. A B<_m.jpg>
 extension is added.
 
+=item * B<Medium 640>
+
+These photos are scaled to 640 pixels at the longest dimension and were added
+by Flickr in August 2010. A B<_z.jpg> extension is added.
+
 =item * B<Square>
 
 These photos are to cropped to 75 x 75 pixels at the center. A B<_s.jpg>
@@ -162,6 +167,15 @@ Boolean.
 
 Retrieve the "medium" version of a photo from the Flickr servers; these photos
 have been scaled to 500 pixels at the longest dimension. 
+
+Default is false.
+
+=item * B<fetch_medium_640>
+
+Boolean.
+
+Retrieve the "medium 640" version of a photo from the Flickr servers; these
+photos have been scaled to 640 pixels at the longest dimension. 
 
 Default is false.
 
@@ -400,6 +414,7 @@ use Sys::Hostname;
 
 Readonly::Hash my %FETCH_SIZES => ('Original'       => '.jpg',
                                    'Medium'         => '_m.jpg',
+                                   'Medium 640'     => '_z.jpg',
                                    'Square'         => '_s.jpg',
                                    'Site MP4'       => '_s.mp4',
                                    'Mobile MP4'     => '_m.mp4',
